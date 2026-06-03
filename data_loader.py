@@ -128,16 +128,21 @@ def ambil_data_marquee() -> list:
         for name, ticker in SAHAM_IDX.items():
             code = name.split(" -- ")[0]
             try:
-                # Jika yf.download mengembalikan MultiIndex columns
+                # yfinance MultiIndex structure: (field, ticker) -> level 0 = fields, level 1 = tickers
+                # Gunakan get_level_values untuk pengecekan yang aman tanpa asumsi urutan level
                 if isinstance(df_all.columns, pd.MultiIndex):
-                    if ticker in df_all.columns.levels[0]:
-                        df_ticker = df_all[ticker].dropna()
-                    elif ticker in df_all.columns.levels[1]:
-                        df_ticker = df_all.xs(ticker, axis=1, level=1).dropna()
+                    all_tickers_in_cols = df_all.columns.get_level_values(1).unique()
+                    all_fields_in_cols = df_all.columns.get_level_values(0).unique()
+                    if ticker in all_tickers_in_cols:
+                        # Format (field, ticker): ambil semua field untuk ticker ini
+                        df_ticker = df_all.xs(ticker, axis=1, level=1).dropna(how="all")
+                    elif ticker in all_fields_in_cols:
+                        # Format tidak biasa (ticker, field): fallback xs level 0
+                        df_ticker = df_all.xs(ticker, axis=1, level=0).dropna(how="all")
                     else:
                         continue
                 else:
-                    df_ticker = df_all.dropna()
+                    df_ticker = df_all.dropna(how="all")
 
                 if len(df_ticker) >= 1:
                     harga_kini = float(df_ticker["Close"].iloc[-1])

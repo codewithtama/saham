@@ -449,7 +449,7 @@ def buat_compare_chart(tickers: list[str], dfs: list[pd.DataFrame]) -> plt.Figur
         loc="upper left",
     )
 
-    for spine in ax.ax.spines.values() if hasattr(ax, "ax") else ax.spines.values():
+    for spine in ax.spines.values():
         spine.set_color("#222222")
     ax.grid(color="#121212", linestyle="-", linewidth=0.8)
     ax.set_title(

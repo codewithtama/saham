@@ -1,4 +1,5 @@
 import warnings
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -7,18 +8,10 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-warnings.filterwarnings("ignore")
-
-# Mekanisme Auto-Reload Modul Dinamis (Menghindari ImportError Caching)
-import importlib
-import sys
-
-if "data_loader" in sys.modules:
-    importlib.reload(sys.modules["data_loader"])
-if "indicators" in sys.modules:
-    importlib.reload(sys.modules["indicators"])
-if "charts" in sys.modules:
-    importlib.reload(sys.modules["charts"])
+# Hanya suppress warning yang sudah diketahui tidak relevan — bukan semua warning
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning, module="yfinance")
+warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
 
 from charts import (
     buat_atr_chart,
@@ -38,6 +31,7 @@ from data_loader import (
     ambil_fundamental,
 )
 from indicators import (
+    LOT_SIZE,
     hitung_konsensus_sinyal,
     hitung_rsi,
     jalankan_backtest,
@@ -428,7 +422,7 @@ def tampilkan_backtest_simulator(df, ticker, modal_awal):
                         "Harga Jual (Rp)": t["harga_jual"],
                         "Return (%)": t["return_pct"],
                         "Profit/Loss (Rp)": t["profit_rp"],
-                        "Volume Lot": int(t["lembar"] // 100),
+                        "Volume Lot": int(t["lembar"] // LOT_SIZE),
                     }
                 )
             df_logs = pd.DataFrame(trade_logs).set_index("No")
@@ -624,16 +618,37 @@ if marquee_data:
     )
 
 
-# Tarik data harga historis & data fundamental secara dinamis untuk seluruh tickers
+# Tarik data harga historis & data fundamental secara paralel untuk seluruh tickers
 periode_kode = TIMEFRAME_OPTIONS[timeframe]
 dfs = []
 fundamentals = []
 valid_tickers = []
 
+
+def _fetch_ticker(ticker: str, periode: str) -> tuple[str, object, dict]:
+    """Fetch data harga + fundamental untuk satu ticker. Dijalankan di thread pool."""
+    df_t = ambil_data(ticker, periode)
+    fund_t = ambil_fundamental(ticker)
+    return ticker, df_t, fund_t
+
+
+with st.spinner(f"Mengambil data {', '.join(tickers)}..."):
+    fetch_results: dict[str, tuple] = {}
+    with ThreadPoolExecutor(max_workers=min(5, len(tickers))) as executor:
+        future_map = {
+            executor.submit(_fetch_ticker, t, periode_kode): t for t in tickers
+        }
+        for future in as_completed(future_map):
+            try:
+                ticker_r, df_t, fund_t = future.result()
+                fetch_results[ticker_r] = (df_t, fund_t)
+            except Exception as exc:
+                st.error(f"Gagal ambil data {future_map[future]}: {exc}")
+
+# Susun ulang sesuai urutan asli pilihan user
 for t in tickers:
-    with st.spinner(f"Mengambil data {t}..."):
-        df_t = ambil_data(t, periode_kode)
-        fund_t = ambil_fundamental(t)
+    if t in fetch_results:
+        df_t, fund_t = fetch_results[t]
         if df_t is not None and not df_t.empty:
             dfs.append(df_t)
             fundamentals.append(fund_t)
@@ -703,8 +718,8 @@ with st.sidebar:
         max_lembar_modal = modal / harga_masuk
         lembar_saham = min(lembar_saham, max_lembar_modal)
 
-        lot_saham = int(lembar_saham // 100)
-        lembar_riil = lot_saham * 100
+        lot_saham = int(lembar_saham // LOT_SIZE)
+        lembar_riil = lot_saham * LOT_SIZE
         dana_terpakai = lembar_riil * harga_masuk
     else:
         lot_saham = 0

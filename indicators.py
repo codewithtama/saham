@@ -1,6 +1,13 @@
 import numpy as np
 import pandas as pd
 
+# ============================================================
+# KONSTANTA BURSA EFEK INDONESIA
+# ============================================================
+LOT_SIZE: int = 100          # 1 lot = 100 lembar saham di BEI
+BROKER_FEE_BUY: float = 0.0015   # 0.15% biaya beli (typical IDX)
+BROKER_FEE_SELL: float = 0.0025  # 0.25% biaya jual + levy (typical IDX)
+
 
 def hitung_ma(close: pd.Series, periode: int) -> pd.Series:
     return close.rolling(window=periode).mean()
@@ -14,14 +21,18 @@ def hitung_rsi(close: pd.Series, periode: int = 14) -> pd.Series:
     delta = close.diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(window=periode).mean()
-    avg_loss = loss.rolling(window=periode).mean()
+
+    # Wilder's Smoothed Moving Average: EMA dengan alpha = 1/periode
+    # Ini adalah standar industri (TradingView, Bloomberg, Reuters)
+    # Berbeda dari SMA biasa yang akan menghasilkan nilai RSI yang berbeda
+    avg_gain = gain.ewm(alpha=1 / periode, min_periods=periode, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1 / periode, min_periods=periode, adjust=False).mean()
 
     rs = avg_gain / avg_loss.replace(0, np.nan)
     rsi = 100 - (100 / (1 + rs))
 
-    # Kalau harga terus naik, loss bisa 0. Dalam kondisi itu RSI seharusnya 100,
-    # bukan netral. Kalau harga benar-benar datar, baru kita anggap netral di 50.
+    # Kalau harga terus naik, loss bisa 0. Dalam kondisi itu RSI seharusnya 100.
+    # Kalau harga benar-benar datar (avg_gain == 0 juga), anggap netral di 50.
     rsi = rsi.mask((avg_loss == 0) & (avg_gain > 0), 100.0)
     rsi = rsi.mask((avg_loss == 0) & (avg_gain == 0), 50.0)
     rsi = rsi.fillna(50.0)
@@ -230,8 +241,10 @@ def jalankan_backtest(df: pd.DataFrame, initial_capital: float = 10000000.0) -> 
     macd, signal_line, _ = hitung_macd(close)
     k_line, d_line = hitung_stochastic(high, low, close)
 
-    # Temukan indeks pertama di mana seluruh indikator penting terhitung (bukan NaN)
+    # Temukan indeks pertama di mana SEMUA indikator penting sudah terhitung (bukan NaN).
+    # Gunakan flag boolean terpisah agar tidak salah override jika valid dari bar ke-0.
     start_idx = 0
+    found_valid_start = False
     for i in range(len(df)):
         if not (
             pd.isna(ma50.iloc[i])
@@ -241,8 +254,11 @@ def jalankan_backtest(df: pd.DataFrame, initial_capital: float = 10000000.0) -> 
             or pd.isna(d_line.iloc[i])
         ):
             start_idx = i
+            found_valid_start = True
             break
-    if start_idx == 0:
+
+    # Fallback jika tidak ada bar yang valid sama sekali (data sangat pendek)
+    if not found_valid_start:
         start_idx = min(50, len(df) - 1) if len(df) > 50 else 0
 
     capital = initial_capital
@@ -250,9 +266,9 @@ def jalankan_backtest(df: pd.DataFrame, initial_capital: float = 10000000.0) -> 
     in_position = False
     buy_price = 0.0
     buy_date = None
-    trades = []
-
-    equity_history = []
+    buy_cost_basis = 0.0  # total modal terpakai termasuk biaya broker
+    trades: list[dict] = []
+    equity_history: list[float] = []
 
     for i in range(start_idx, len(df)):
         buy_indicators = 0
@@ -289,7 +305,7 @@ def jalankan_backtest(df: pd.DataFrame, initial_capital: float = 10000000.0) -> 
         elif st_k > 80 and st_k < st_d:
             sell_indicators += 1
 
-        # Aturan sederhana: beli/jual hanya kalau minimal ada 2 tanda yang searah
+        # Beli/jual hanya kalau minimal ada 2 tanda yang searah dan tidak ada konflik
         daily_signal = "HOLD"
         if buy_indicators >= 2 and sell_indicators == 0:
             daily_signal = "BUY"
@@ -298,21 +314,27 @@ def jalankan_backtest(df: pd.DataFrame, initial_capital: float = 10000000.0) -> 
 
         close_price = float(df["Close"].iloc[i])
 
-        # Eksekusi Simulasi Transaksi (LONG)
+        # === Eksekusi Simulasi Transaksi (LONG only) ===
         if not in_position and daily_signal == "BUY":
-            lot_saham = int(capital // (close_price * 100))
+            # Hitung lot maksimal dengan memperhitungkan biaya broker saat beli
+            cost_per_lot = close_price * LOT_SIZE * (1 + BROKER_FEE_BUY)
+            lot_saham = int(capital // cost_per_lot)
             if lot_saham > 0:
-                shares = lot_saham * 100
+                shares = lot_saham * LOT_SIZE
                 buy_price = close_price
                 buy_date = df.index[i]
-                capital -= shares * buy_price
+                buy_cost_basis = shares * buy_price * (1 + BROKER_FEE_BUY)
+                capital -= buy_cost_basis
                 in_position = True
+
         elif in_position and daily_signal == "SELL":
             sell_price = close_price
-            revenue = shares * sell_price
-            capital += revenue
-            profit_loss_pct = ((sell_price - buy_price) / buy_price) * 100
-            profit_loss_rp = revenue - (shares * buy_price)
+            # Net proceeds setelah potong biaya jual + levy BEI
+            net_proceeds = shares * sell_price * (1 - BROKER_FEE_SELL)
+            capital += net_proceeds
+
+            profit_loss_rp = net_proceeds - buy_cost_basis
+            profit_loss_pct = (profit_loss_rp / buy_cost_basis) * 100
 
             trades.append(
                 {
@@ -327,8 +349,9 @@ def jalankan_backtest(df: pd.DataFrame, initial_capital: float = 10000000.0) -> 
             )
             shares = 0
             in_position = False
+            buy_cost_basis = 0.0
 
-        # Rekam ekuitas harian
+        # Rekam ekuitas harian (mark-to-market)
         current_equity = capital + (shares * close_price if in_position else 0)
         equity_history.append(current_equity)
 
