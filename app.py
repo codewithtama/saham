@@ -586,7 +586,13 @@ with st.sidebar:
 st.title("ANALISA SAHAM BEI/IDX")
 
 # Ambil data bursa marquee secara efisien (konkuren & cached)
-marquee_data = ambil_data_marquee()
+# Dibungkus try/except tambahan sebagai lapisan perlindungan terakhir agar
+# kegagalan atau timeout di sini tidak pernah menghentikan render halaman.
+try:
+    marquee_data = ambil_data_marquee()
+except Exception:
+    marquee_data = None
+
 if marquee_data:
     ticker_html_items = []
     for item in marquee_data:
