@@ -13,6 +13,15 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning, module="yfinance")
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
 
+import importlib
+import charts
+import data_loader
+import indicators
+
+importlib.reload(charts)
+importlib.reload(data_loader)
+importlib.reload(indicators)
+
 from charts import (
     buat_atr_chart,
     buat_candlestick,
@@ -22,6 +31,7 @@ from charts import (
     buat_rsi_chart,
     buat_stochastic_chart,
     buat_volatilitas_chart,
+    buat_financial_chart,
 )
 from data_loader import (
     SAHAM_IDX,
@@ -29,12 +39,12 @@ from data_loader import (
     ambil_data,
     ambil_data_marquee,
     ambil_fundamental,
+    ambil_financial_history,
+    ambil_dividend_history,
 )
 from indicators import (
-    LOT_SIZE,
     hitung_konsensus_sinyal,
     hitung_rsi,
-    jalankan_backtest,
     sinyal_teknikal,
 )
 
@@ -253,6 +263,15 @@ def tampilkan_profil_perusahaan(fundamental, ticker):
     h52_val = fundamental["high_52w"]
     l52_val = fundamental["low_52w"]
 
+    pbv_val = fundamental.get("pbv")
+    pbv_str = f"{pbv_val:.2f}x" if pbv_val is not None else "Tidak tersedia"
+
+    roe_val = fundamental.get("roe")
+    roe_str = f"{roe_val * 100:.2f}%" if roe_val is not None else "Tidak tersedia"
+
+    der_val = fundamental.get("der")
+    der_str = f"{der_val:.2f}%" if der_val is not None else "Tidak tersedia"
+
     # Ringkasan angka utama dalam kotak sederhana
     st.markdown("**Angka Penting**")
     m1, m2, m3 = st.columns(3)
@@ -271,9 +290,120 @@ def tampilkan_profil_perusahaan(fundamental, ticker):
         "Harga Terendah 1 Tahun", f"Rp {l52_val:,.0f}" if l52_val else "Tidak tersedia"
     )
 
+    m7, m8, m9 = st.columns(3)
+    m7.metric("P/B Ratio (PBV)", pbv_str)
+    m8.metric("Return on Equity (ROE)", roe_str)
+    m9.metric("Debt to Equity (DER)", der_str)
+
     # Ringkasan Bisnis Ekspander
     with st.expander("Cerita Singkat Perusahaan"):
         st.write(fundamental["ringkasan"])
+
+
+def tampilkan_analisis_fundamental_tambahan(ticker, fundamental):
+    if not fundamental:
+        return
+        
+    st.markdown("### Kinerja Keuangan & Dividen")
+    
+    df_fin = ambil_financial_history(ticker)
+    
+    tab_fin, tab_div = st.tabs(["Laporan Keuangan Tahunan", "Histori Dividen"])
+    
+    with tab_fin:
+        if df_fin is not None and not df_fin.empty:
+            fig_fin = buat_financial_chart(df_fin, ticker)
+            st.pyplot(fig_fin, use_container_width=True)
+            plt.close(fig_fin)
+            
+            df_fin_show = df_fin.copy()
+            df_fin_show.index = [str(date)[:4] for date in df_fin_show.index]
+            df_fin_show.columns = ["Pendapatan (Revenue)", "Laba Bersih (Net Income)"]
+            st.dataframe(
+                df_fin_show.style.format("Rp {:,.0f}"),
+                use_container_width=True
+            )
+        else:
+            st.info("Data laporan keuangan tahunan tidak tersedia untuk emiten ini.")
+            
+    with tab_div:
+        df_div = ambil_dividend_history(ticker)
+        
+        po_val = fundamental.get("payout_ratio")
+        po_str = f"{po_val * 100:.2f}%" if po_val is not None else "Tidak tersedia"
+        
+        col_po, _ = st.columns([1, 2])
+        col_po.metric("Dividend Payout Ratio (DPR)", po_str)
+        
+        if df_div is not None and not df_div.empty:
+            df_div_show = df_div.head(10).copy()
+            df_div_show.index = df_div_show.index.strftime("%Y-%m-%d")
+            df_div_show.columns = ["Nilai Dividen (per Lembar)"]
+            st.dataframe(
+                df_div_show.style.format("Rp {:,.2f}"),
+                use_container_width=True
+            )
+        else:
+            st.info("Histori pembagian dividen tidak tersedia untuk emiten ini.")
+
+
+def tampilkan_peer_group_analysis(ticker, fundamental):
+    sektor = fundamental.get("sektor")
+    if not sektor:
+        return
+        
+    st.markdown(f"### Perbandingan Sektoral ({sektor})")
+    
+    peers = []
+    for nama_saham, tick in SAHAM_IDX.items():
+        if tick == ticker:
+            continue
+        fund = ambil_fundamental(tick)
+        if fund and fund.get("sektor") == sektor:
+            peers.append((tick, fund))
+            if len(peers) >= 4:
+                break
+                
+    all_peers = [(ticker, fundamental)] + peers
+    
+    rows = []
+    for tick, f in all_peers:
+        mc_val = f.get("market_cap")
+        mc_str = f"Rp {mc_val / 1e12:.2f} T" if mc_val and mc_val >= 1e12 else (f"Rp {mc_val / 1e9:.2f} M" if mc_val and mc_val >= 1e9 else "N/A")
+        
+        pe_val = f.get("pe_ratio")
+        pe_str = f"{pe_val:.2f}x" if pe_val else "N/A"
+        
+        pbv_val = f.get("pbv")
+        pbv_str = f"{pbv_val:.2f}x" if pbv_val is not None else "N/A"
+        
+        roe_val = f.get("roe")
+        roe_str = f"{roe_val * 100:.2f}%" if roe_val is not None else "N/A"
+        
+        der_val = f.get("der")
+        der_str = f"{der_val:.2f}%" if der_val is not None else "N/A"
+        
+        div_val = f.get("dividend_yield")
+        div_persen = div_val if div_val and div_val > 1.0 else (div_val * 100 if div_val else 0)
+        div_str = f"{div_persen:.2f}%" if div_val else "N/A"
+        
+        display_ticker = tick.split(".JK")[0]
+        if tick == ticker:
+            display_ticker = f"{display_ticker} (Aktif)"
+            
+        rows.append({
+            "Kode": display_ticker,
+            "Perusahaan": f.get("nama", tick.split(".JK")[0]),
+            "Market Cap": mc_str,
+            "P/E Ratio": pe_str,
+            "PBV Ratio": pbv_str,
+            "ROE": roe_str,
+            "DER": der_str,
+            "Div Yield": div_str
+        })
+        
+    df_peers = pd.DataFrame(rows)
+    st.dataframe(df_peers.set_index("Kode"), use_container_width=True)
 
 
 def tampilkan_metrik_dan_sinyal(df, ticker, timeframe):
@@ -372,102 +502,7 @@ def tampilkan_data_historis(df, ticker):
         )
 
 
-def tampilkan_backtest_simulator(df, ticker, modal_awal):
-    st.markdown(f"### Coba Simulasi Cara Beli/Jual: {ticker}")
-    backtest = jalankan_backtest(df, modal_awal)
 
-    # Grid metrik 4 kolom
-    c1, c2, c3, c4 = st.columns(4)
-
-    ret_strat = backtest["total_return"]
-    ret_bench = backtest["benchmark_return"]
-    c1.metric(
-        "Hasil Cara Ini vs Beli & Simpan",
-        f"{ret_strat:+.2f}%",
-        f"Beli & simpan: {ret_bench:+.2f}%",
-    )
-
-    win_rate = backtest["win_rate"]
-    total_trades = backtest["total_trades"]
-    c2.metric(
-        "Transaksi yang Untung", f"{win_rate:.1f}%", f"Total Transaksi: {total_trades}x"
-    )
-
-    max_dd = backtest["max_drawdown"]
-    c3.metric("Penurunan Terbesar", f"{max_dd:.2f}%", "Risiko terbesar dari simulasi")
-
-    sharpe = backtest["sharpe_ratio"]
-    sharpe_label = "Sangat Bagus" if sharpe > 2 else ("Bagus" if sharpe > 1 else ("Cukup" if sharpe > 0 else "Buruk"))
-    c4.metric("Sharpe Ratio", f"{sharpe:.2f}", sharpe_label)
-
-    has_open = any(t.get("masih_buka") for t in backtest["trades"])
-    open_note = " (termasuk 1 posisi masih terbuka ⚡)" if has_open else ""
-
-    # Rangkuman deskriptif dalam Bahasa Indonesia
-    if total_trades > 0 or has_open:
-        outperforms = "mengungguli" if ret_strat > ret_bench else "tertinggal dari"
-        selisih = abs(ret_strat - ret_bench)
-        st.markdown(
-            f"""
-        <div style="background-color: #0a0a0a; border: 1px solid #333333; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-bottom: 15px;">
-            Dengan modal awal <span style="color: #ffa500; font-weight: bold;">Rp {modal_awal:,.0f}</span>, simulasi ini menunjukkan bahwa cara
-            <span style="color: #00ff00; font-weight: bold;">GAMBARAN CEPAT</span> {outperforms} cara beli lalu simpan saja, dengan beda hasil
-            <span style="color: #00ffff; font-weight: bold;">{selisih:.2f}%</span>. Dari total
-            <span style="color: #ffffff; font-weight: bold;">{total_trades}</span> transaksi{open_note},
-            <span style="color: #00ff00; font-weight: bold;">{win_rate:.1f}%</span> berakhir untung. Penurunan nilai terbesar selama simulasi adalah
-            <span style="color: #ff3333; font-weight: bold;">{max_dd:.2f}%</span>.
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-        # Expander Rincian Log Transaksi
-        with st.expander(f"Lihat Catatan Beli/Jual Simulasi {ticker}"):
-            if has_open:
-                st.info("⚡ Baris dengan tanda '(Buka)' adalah posisi yang masih dipegang sampai akhir periode — belum terealisasi.")
-            trade_logs = []
-            for idx, t in enumerate(backtest["trades"]):
-                fmt_beli = t["tanggal_beli"].strftime("%Y-%m-%d")
-                is_open = t.get("masih_buka", False)
-                label_jual = (
-                    f"{t['tanggal_jual'].strftime('%Y-%m-%d')} (Buka)"
-                    if is_open
-                    else t["tanggal_jual"].strftime("%Y-%m-%d")
-                )
-                trade_logs.append(
-                    {
-                        "No": idx + 1,
-                        "Tgl Beli": fmt_beli,
-                        "Tgl Jual": label_jual,
-                        "Harga Beli (Rp)": t["harga_beli"],
-                        "Harga Jual (Rp)": t["harga_jual"],
-                        "Return (%)": t["return_pct"],
-                        "Profit/Loss (Rp)": t["profit_rp"],
-                        "Volume Lot": int(t["lembar"] // LOT_SIZE),
-                    }
-                )
-            df_logs = pd.DataFrame(trade_logs).set_index("No")
-            st.dataframe(
-                df_logs.style.format(
-                    {
-                        "Harga Beli (Rp)": "Rp {:,.0f}",
-                        "Harga Jual (Rp)": "Rp {:,.0f}",
-                        "Return (%)": "{:+.2f}%",
-                        "Profit/Loss (Rp)": "Rp {:+,.0f}",
-                        "Volume Lot": "{:,} Lot",
-                    }
-                ),
-                use_container_width=True,
-            )
-    else:
-        st.markdown(
-            f"""
-        <div style="background-color: #0a0a0a; border: 1px solid #333333; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-bottom: 15px;">
-            <span style="color: #ffa500; font-weight: bold;">INFO:</span> Selama periode ini belum ada momen beli/jual yang cukup kuat menurut aturan aplikasi. Biasanya ini terjadi saat harga bergerak datar atau tandanya masih campur aduk.
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
 
 
 # ========================================
@@ -675,83 +710,7 @@ if not dfs:
     st.stop()
 
 
-# ========================================
-# RENDER KALKULATOR RISIKO DI SIDEBAR (DENGAN DATA AKTIF)
-# ========================================
-with st.sidebar:
-    st.divider()
-    st.markdown("### HITUNG RISIKO & LOT")
 
-    # Pilih saham untuk dikalkulasi jika dalam mode perbandingan
-    if len(valid_tickers) > 1:
-        calc_ticker = st.selectbox(
-            "Pilih Saham Kalkulator", valid_tickers, key="sb_calc_ticker_sel"
-        )
-        idx_calc = valid_tickers.index(calc_ticker)
-        df_calc = dfs[idx_calc]
-    else:
-        calc_ticker = valid_tickers[0]
-        df_calc = dfs[0]
-
-    harga_kini = float(df_calc["Close"].iloc[-1])
-
-    # Input parameter kalkulator di sidebar
-    modal = st.number_input(
-        "Modal Maksimal (Rp)",
-        min_value=100000.0,
-        value=10000000.0,
-        step=100000.0,
-        format="%.0f",
-        key="sb_calc_modal_val",
-    )
-    harga_masuk = st.number_input(
-        "Harga Beli (Rp)",
-        min_value=1.0,
-        value=harga_kini,
-        step=50.0,
-        format="%.0f",
-        key="sb_calc_masuk_val",
-    )
-    persen_risk = st.number_input(
-        "Batas Risiko (%)",
-        min_value=0.5,
-        max_value=25.0,
-        value=5.0,
-        step=0.5,
-        format="%.1f",
-        key="sb_calc_risk_val",
-    )
-
-    # Kalkulasi Matematika Money Management
-    rupiah_risk = modal * (persen_risk / 100)
-    harga_stop_loss = harga_masuk * (1 - persen_risk / 100)
-    selisih_harga = harga_masuk - harga_stop_loss
-
-    if selisih_harga > 0:
-        lembar_saham = rupiah_risk / selisih_harga
-        max_lembar_modal = modal / harga_masuk
-        lembar_saham = min(lembar_saham, max_lembar_modal)
-
-        lot_saham = int(lembar_saham // LOT_SIZE)
-        lembar_riil = lot_saham * LOT_SIZE
-        dana_terpakai = lembar_riil * harga_masuk
-    else:
-        lot_saham = 0
-        lembar_riil = 0
-        dana_terpakai = 0
-
-    # Tampilkan hasil hitung lot dan risiko di sidebar
-    st.markdown(
-        f"""
-    <div style="background-color: #0a0a0a; border: 1px solid #333333; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11px;">
-        <div style="margin-bottom: 6px;"><span style="color:#ffa500; font-weight:bold;">Maks Beli:</span> <span style="color:#00ff00; font-weight:bold;">{lot_saham:,} Lot</span> ({lembar_riil:,} Lbr)</div>
-        <div style="margin-bottom: 6px;"><span style="color:#ffa500; font-weight:bold;">Dana Pakai:</span> <span style="color:#ffffff;">Rp {dana_terpakai:,.0f}</span></div>
-        <div style="margin-bottom: 6px;"><span style="color:#ffa500; font-weight:bold;">Stop Loss:</span> <span style="color:#ff3333; font-weight:bold;">Rp {harga_stop_loss:,.0f}</span></div>
-        <div><span style="color:#ffa500; font-weight:bold;">Resiko Rp:</span> <span style="color:#ffffff;">Rp {rupiah_risk:,.0f} ({persen_risk:.1f}%)</span></div>
-    </div>
-    """,
-        unsafe_allow_html=True,
-    )
 
 # ========================================
 # RENDERING HALAMAN UTAMA
@@ -839,9 +798,13 @@ if mode == "Bandingkan Saham (Maks 5)" and len(valid_tickers) > 1:
             tampilkan_metrik_dan_sinyal(d, t, timeframe)
             st.divider()
 
-            # Simulator Backtesting
-            tampilkan_backtest_simulator(d, t, modal)
+            # Fundamental tambahan & Peer group
+            tampilkan_analisis_fundamental_tambahan(t, f)
             st.divider()
+            tampilkan_peer_group_analysis(t, f)
+            st.divider()
+
+
 
             # Alat bantu grafik yang dipilih
             if show_rsi:
@@ -899,12 +862,14 @@ else:
 
     tampilkan_profil_perusahaan(fund_utama, t_utama)
     st.divider()
+    tampilkan_analisis_fundamental_tambahan(t_utama, fund_utama)
+    st.divider()
+    tampilkan_peer_group_analysis(t_utama, fund_utama)
+    st.divider()
     tampilkan_metrik_dan_sinyal(df_utama, t_utama, timeframe)
     st.divider()
 
-    # Simulator Backtesting
-    tampilkan_backtest_simulator(df_utama, t_utama, modal)
-    st.divider()
+
 
     st.subheader("Grafik Utama")
     fig_candle = buat_candlestick(
@@ -957,6 +922,9 @@ else:
 st.divider()
 st.caption(
     "Dibuat dengan Python -- Streamlit + Pandas + NumPy + Matplotlib + mplfinance + yfinance"
+)
+st.caption(
+    "Sumber Data Keuangan, Dividen, dan Marquee: Yahoo Finance (yfinance) | Indikator Teknikal: Dihitung Mandiri (Pandas/NumPy)"
 )
 waktu_wib = datetime.now(ZoneInfo("Asia/Jakarta"))
 st.caption(

@@ -109,11 +109,76 @@ def ambil_fundamental(ticker: str) -> dict:
             "dividend_yield": info.get("dividendYield"),
             "high_52w": info.get("fiftyTwoWeekHigh"),
             "low_52w": info.get("fiftyTwoWeekLow"),
+            "pbv": info.get("priceToBook"),
+            "roe": info.get("returnOnEquity"),
+            "der": info.get("debtToEquity"),
+            "eps": info.get("trailingEps"),
+            "bvps": info.get("bookValue"),
+            "payout_ratio": info.get("payoutRatio"),
         }
     except Exception as exc:
         # Non-critical: fundamental data tidak tersedia, tampilkan profil kosong
         st.warning(f"Data fundamental {ticker} tidak tersedia: {type(exc).__name__}")
         return {}
+
+
+@st.cache_data(ttl=3600)
+def ambil_financial_history(ticker: str) -> pd.DataFrame | None:
+    try:
+        t = yf.Ticker(ticker)
+        df_fin = t.financials
+        if df_fin is None or df_fin.empty:
+            return None
+        
+        # Transpose agar baris adalah tanggal/tahun
+        df_t = df_fin.T
+        
+        # Cari kolom Revenue dan Net Income dengan pencarian substring agar tangguh
+        rev_col = None
+        net_col = None
+        for col in df_t.columns:
+            col_lower = str(col).lower()
+            if "total revenue" in col_lower or "operating revenue" in col_lower or col_lower == "revenue":
+                rev_col = col
+            if "net income" in col_lower and "continuous" not in col_lower:
+                net_col = col
+                
+        # Fallback jika nama kolom beda
+        if not rev_col:
+            for col in df_t.columns:
+                if "revenue" in str(col).lower():
+                    rev_col = col
+                    break
+        if not net_col:
+            for col in df_t.columns:
+                if "net income" in str(col).lower():
+                    net_col = col
+                    break
+                    
+        if rev_col and net_col:
+            res = df_t[[rev_col, net_col]].copy()
+            res.columns = ["Revenue", "Net_Income"]
+            res = res.sort_index(ascending=True)
+            return res
+        return None
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=3600)
+def ambil_dividend_history(ticker: str) -> pd.DataFrame | None:
+    try:
+        t = yf.Ticker(ticker)
+        divs = t.dividends
+        if divs is None or divs.empty:
+            return None
+        
+        df_div = pd.DataFrame(divs)
+        df_div.columns = ["Dividen"]
+        df_div = df_div.sort_index(ascending=False)
+        return df_div
+    except Exception:
+        return None
 
 
 @st.cache_data(ttl=300)

@@ -651,3 +651,79 @@ def buat_atr_chart(df: pd.DataFrame) -> plt.Figure:
 
     plt.tight_layout()
     return fig
+
+
+def buat_financial_chart(df_fin: pd.DataFrame, ticker: str) -> plt.Figure:
+    fig, ax = plt.subplots(figsize=(13, 4.5), facecolor="#000000")
+    ax.set_facecolor("#000000")
+    
+    # Indeks adalah tanggal laporan (biasanya datetime). Format ke Tahun.
+    years = [str(date)[:4] for date in df_fin.index]
+    
+    raw_rev = df_fin["Revenue"]
+    raw_net = df_fin["Net_Income"]
+    
+    # Cari nilai maksimum untuk menentukan skala
+    max_val = max(raw_rev.abs().max(), raw_net.abs().max())
+    if max_val >= 1e12:
+        divisor = 1e12
+        unit = "Rp Triliun"
+    elif max_val >= 1e9:
+        divisor = 1e9
+        unit = "Rp Miliar"
+    else:
+        divisor = 1.0
+        unit = "Rupiah"
+        
+    revenue = raw_rev / divisor
+    net_income = raw_net / divisor
+    
+    x = np.arange(len(years))
+    width = 0.35
+    
+    # Bar Chart dengan warna neon orange dan hijau
+    rects1 = ax.bar(x - width/2, revenue, width, label="Pendapatan (Revenue)", color="#ffa500", alpha=0.85)
+    rects2 = ax.bar(x + width/2, net_income, width, label="Laba Bersih (Net Income)", color="#00e676", alpha=0.85)
+    
+    # Tambahkan angka di atas setiap bar
+    for r in rects1:
+        h = r.get_height()
+        sign = 1 if h >= 0 else -1
+        offset = 3 if h >= 0 else -10
+        ax.annotate(f"{h:.1f}",
+                    xy=(r.get_x() + r.get_width() / 2, h),
+                    xytext=(0, offset),  # 3 points vertical offset
+                    textcoords="offset points",
+                    ha="center", va="bottom" if h >= 0 else "top", color="#ffa500", fontsize=7.5)
+                    
+    for r in rects2:
+        h = r.get_height()
+        sign = 1 if h >= 0 else -1
+        offset = 3 if h >= 0 else -10
+        ax.annotate(f"{h:.1f}",
+                    xy=(r.get_x() + r.get_width() / 2, h),
+                    xytext=(0, offset),
+                    textcoords="offset points",
+                    ha="center", va="bottom" if h >= 0 else "top", color="#00e676", fontsize=7.5)
+    
+    ax.set_ylabel(f"Nilai ({unit})", color="#ffa500", fontsize=9)
+    ax.set_title(f"{ticker} -- Tren Laporan Keuangan Tahunan (Revenue vs Net Income)", color="#ffa500", fontsize=11, fontweight="bold", loc="left", pad=15)
+    ax.set_xticks(x)
+    ax.set_xticklabels(years)
+    ax.tick_params(colors="#8b949e", labelsize=8)
+    
+    for spine in ax.spines.values():
+        spine.set_color("#222222")
+    ax.grid(color="#121212", linestyle="-", linewidth=0.8)
+    
+    ax.legend(
+        loc="upper left",
+        fontsize=8,
+        labelcolor="#ffffff",
+        framealpha=0.5,
+        facecolor="#080808",
+        edgecolor="#333333"
+    )
+    
+    plt.tight_layout()
+    return fig
