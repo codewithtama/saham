@@ -110,7 +110,9 @@ def ambil_fundamental(ticker: str) -> dict:
             "high_52w": info.get("fiftyTwoWeekHigh"),
             "low_52w": info.get("fiftyTwoWeekLow"),
         }
-    except Exception:
+    except Exception as exc:
+        # Non-critical: fundamental data tidak tersedia, tampilkan profil kosong
+        st.warning(f"Data fundamental {ticker} tidak tersedia: {type(exc).__name__}")
         return {}
 
 

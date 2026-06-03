@@ -39,6 +39,16 @@ from indicators import (
 )
 
 # ========================================
+# FUNGSI FETCH (didefinisikan lebih awal agar tidak re-define tiap sidebar rerun)
+# ========================================
+def _fetch_ticker(ticker: str, periode: str) -> tuple[str, object, dict]:
+    """Fetch data harga + fundamental untuk satu ticker. Dijalankan di thread pool."""
+    df_t = ambil_data(ticker, periode)
+    fund_t = ambil_fundamental(ticker)
+    return ticker, df_t, fund_t
+
+
+# ========================================
 # KONFIGURASI HALAMAN
 # ========================================
 st.set_page_config(
@@ -366,10 +376,9 @@ def tampilkan_backtest_simulator(df, ticker, modal_awal):
     st.markdown(f"### Coba Simulasi Cara Beli/Jual: {ticker}")
     backtest = jalankan_backtest(df, modal_awal)
 
-    # Grid metrik 3 kolom
-    c1, c2, c3 = st.columns(3)
+    # Grid metrik 4 kolom
+    c1, c2, c3, c4 = st.columns(4)
 
-    # Col 1: Return Strategi vs Benchmark
     ret_strat = backtest["total_return"]
     ret_bench = backtest["benchmark_return"]
     c1.metric(
@@ -378,19 +387,24 @@ def tampilkan_backtest_simulator(df, ticker, modal_awal):
         f"Beli & simpan: {ret_bench:+.2f}%",
     )
 
-    # Col 2: Win Rate
     win_rate = backtest["win_rate"]
     total_trades = backtest["total_trades"]
     c2.metric(
         "Transaksi yang Untung", f"{win_rate:.1f}%", f"Total Transaksi: {total_trades}x"
     )
 
-    # Col 3: Max Drawdown (Penurunan Nilai Portofolio Terbesar)
     max_dd = backtest["max_drawdown"]
     c3.metric("Penurunan Terbesar", f"{max_dd:.2f}%", "Risiko terbesar dari simulasi")
 
+    sharpe = backtest["sharpe_ratio"]
+    sharpe_label = "Sangat Bagus" if sharpe > 2 else ("Bagus" if sharpe > 1 else ("Cukup" if sharpe > 0 else "Buruk"))
+    c4.metric("Sharpe Ratio", f"{sharpe:.2f}", sharpe_label)
+
+    has_open = any(t.get("masih_buka") for t in backtest["trades"])
+    open_note = " (termasuk 1 posisi masih terbuka ⚡)" if has_open else ""
+
     # Rangkuman deskriptif dalam Bahasa Indonesia
-    if total_trades > 0:
+    if total_trades > 0 or has_open:
         outperforms = "mengungguli" if ret_strat > ret_bench else "tertinggal dari"
         selisih = abs(ret_strat - ret_bench)
         st.markdown(
@@ -399,7 +413,7 @@ def tampilkan_backtest_simulator(df, ticker, modal_awal):
             Dengan modal awal <span style="color: #ffa500; font-weight: bold;">Rp {modal_awal:,.0f}</span>, simulasi ini menunjukkan bahwa cara
             <span style="color: #00ff00; font-weight: bold;">GAMBARAN CEPAT</span> {outperforms} cara beli lalu simpan saja, dengan beda hasil
             <span style="color: #00ffff; font-weight: bold;">{selisih:.2f}%</span>. Dari total
-            <span style="color: #ffffff; font-weight: bold;">{total_trades}</span> transaksi,
+            <span style="color: #ffffff; font-weight: bold;">{total_trades}</span> transaksi{open_note},
             <span style="color: #00ff00; font-weight: bold;">{win_rate:.1f}%</span> berakhir untung. Penurunan nilai terbesar selama simulasi adalah
             <span style="color: #ff3333; font-weight: bold;">{max_dd:.2f}%</span>.
         </div>
@@ -409,15 +423,22 @@ def tampilkan_backtest_simulator(df, ticker, modal_awal):
 
         # Expander Rincian Log Transaksi
         with st.expander(f"Lihat Catatan Beli/Jual Simulasi {ticker}"):
+            if has_open:
+                st.info("⚡ Baris dengan tanda '(Buka)' adalah posisi yang masih dipegang sampai akhir periode — belum terealisasi.")
             trade_logs = []
             for idx, t in enumerate(backtest["trades"]):
                 fmt_beli = t["tanggal_beli"].strftime("%Y-%m-%d")
-                fmt_jual = t["tanggal_jual"].strftime("%Y-%m-%d")
+                is_open = t.get("masih_buka", False)
+                label_jual = (
+                    f"{t['tanggal_jual'].strftime('%Y-%m-%d')} (Buka)"
+                    if is_open
+                    else t["tanggal_jual"].strftime("%Y-%m-%d")
+                )
                 trade_logs.append(
                     {
                         "No": idx + 1,
                         "Tgl Beli": fmt_beli,
-                        "Tgl Jual": fmt_jual,
+                        "Tgl Jual": label_jual,
                         "Harga Beli (Rp)": t["harga_beli"],
                         "Harga Jual (Rp)": t["harga_jual"],
                         "Return (%)": t["return_pct"],
@@ -623,13 +644,6 @@ periode_kode = TIMEFRAME_OPTIONS[timeframe]
 dfs = []
 fundamentals = []
 valid_tickers = []
-
-
-def _fetch_ticker(ticker: str, periode: str) -> tuple[str, object, dict]:
-    """Fetch data harga + fundamental untuk satu ticker. Dijalankan di thread pool."""
-    df_t = ambil_data(ticker, periode)
-    fund_t = ambil_fundamental(ticker)
-    return ticker, df_t, fund_t
 
 
 with st.spinner(f"Mengambil data {', '.join(tickers)}..."):
