@@ -1,0 +1,2 @@
+# File ini menjaga agar folder cache/ masuk ke git tracking.
+# File CSV dan JSON di dalamnya di-exclude via .gitignore.

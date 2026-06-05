@@ -34,3 +34,8 @@ Thumbs.db
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb
+
+# Offline cache — data pasar disimpan lokal, jangan masuk repo
+cache/*.csv
+cache/*.json
+cache/*.meta

@@ -710,6 +710,51 @@ if not dfs:
     st.stop()
 
 
+# ========================================
+# BANNER MODE OFFLINE
+# ========================================
+if st.session_state.get("offline_mode"):
+    sources = st.session_state.get("offline_sources", [])
+    cache_times = st.session_state.get("offline_cache_times", {})
+
+    # Ambil timestamp cache terlama untuk ditampilkan
+    oldest_ts = None
+    for ts in cache_times.values():
+        if ts:
+            try:
+                dt = datetime.fromisoformat(ts)
+                if oldest_ts is None or dt < oldest_ts:
+                    oldest_ts = dt
+            except Exception:
+                pass
+
+    ts_str = oldest_ts.strftime("%d %b %Y %H:%M") if oldest_ts else "waktu tidak diketahui"
+
+    sumber_str = ", ".join(sources) if sources else "beberapa sumber"
+    st.markdown(
+        f"""
+    <div style="
+        background-color: #1a1200;
+        border: 1px solid #ffa500;
+        border-left: 4px solid #ffa500;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+    ">
+        <span style="color: #ffa500; font-weight: bold; font-size: 13px;">⚠ MODE OFFLINE</span>
+        <span style="color: #c9d1d9; margin-left: 10px;">Tidak ada koneksi internet — menampilkan data cache terakhir.</span>
+        <div style="color: #8b949e; margin-top: 5px;">
+            Cache dari: <span style="color: #ffa500;">{ts_str} WIB</span>
+            &nbsp;|&nbsp; Sumber: {sumber_str}
+        </div>
+        <div style="color: #8b949e; margin-top: 3px; font-size: 11px;">
+            Hubungkan internet lalu refresh browser untuk mendapatkan data terbaru.
+        </div>
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 # ========================================
@@ -927,6 +972,9 @@ st.caption(
     "Sumber Data Keuangan, Dividen, dan Marquee: Yahoo Finance (yfinance) | Indikator Teknikal: Dihitung Mandiri (Pandas/NumPy)"
 )
 waktu_wib = datetime.now(ZoneInfo("Asia/Jakarta"))
-st.caption(
-    f"Data diperbarui setiap 5 menit -- Terakhir diambil: {waktu_wib.strftime('%d %b %Y %H:%M WIB')}"
-)
+if st.session_state.get("offline_mode"):
+    st.caption("⚠ MODE OFFLINE — Data yang ditampilkan berasal dari cache lokal, bukan data real-time.")
+else:
+    st.caption(
+        f"Data diperbarui setiap 5 menit -- Terakhir diambil: {waktu_wib.strftime('%d %b %Y %H:%M WIB')}"
+    )
