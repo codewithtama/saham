@@ -704,7 +704,6 @@ with st.sidebar:
 
     st.divider()
     st.caption("Data: Yahoo Finance (yfinance)")
-    st.caption("Disclaimer: Bukan rekomendasi investasi.")
 
 # ========================================
 # MAIN -- AMBIL DATA
