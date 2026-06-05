@@ -1,266 +1,258 @@
 # Analisa Saham BEI/IDX
 
-Analisa Saham BEI/IDX adalah aplikasi Streamlit untuk membantu membaca data saham Indonesia dengan bahasa yang lebih mudah dipahami. Data harga dan profil perusahaan diambil dari Yahoo Finance melalui `yfinance`.
+Dashboard analisis saham Indonesia berbasis Streamlit. Data harga, profil perusahaan, laporan keuangan, dan histori dividen diambil dari Yahoo Finance melalui `yfinance`.
 
-Aplikasi ini dibuat sebagai alat bantu belajar dan analisa awal, bukan sebagai rekomendasi investasi resmi.
+Dibuat sebagai alat bantu belajar dan analisa awal -- bukan rekomendasi investasi.
 
-## Yang Bisa Dilakukan Aplikasi Ini
+---
 
-Dengan aplikasi ini, pengguna bisa:
+## Fitur Utama
 
-- melihat harga saham BEI/IDX,
-- membaca ringkasan singkat perusahaan,
-- melihat grafik harga saham,
-- membandingkan sampai 5 saham sekaligus,
-- membaca tanda sederhana dari beberapa indikator grafik,
-- mencoba simulasi cara beli/jual berdasarkan data lama,
-- menghitung risiko, stop loss, dan jumlah lot secara otomatis.
+- Melihat harga dan grafik saham BEI/IDX secara real-time
+- Profil perusahaan: sektor, ringkasan bisnis, market cap, P/E, PBV, ROE, DER, beta, dividen
+- Laporan keuangan tahunan (revenue dan net income) dalam bentuk grafik dan tabel
+- Histori pembagian dividen
+- Perbandingan sektoral dengan emiten di sektor yang sama
+- Sinyal teknikal dari RSI, MA Cross, MACD, dan Stochastic
+- Ringkasan konsensus sinyal dalam bahasa sederhana
+- Membandingkan sampai 5 saham sekaligus dengan grafik yang dinormalisasi ke 100%
+- Simulasi beli/jual berdasarkan data historis dengan laporan win rate, drawdown, dan Sharpe Ratio
+- Kalkulator risiko dan jumlah lot berdasarkan modal, harga beli, dan batas risiko
+- Ekspor data historis ke CSV
+- Running text harga saham di bagian atas halaman
+- Mode offline: jika tidak ada internet, data ditampilkan dari cache lokal terakhir
 
-## Tampilan Utama
-
-Aplikasi memiliki tampilan gelap dengan warna hijau untuk kondisi naik dan merah untuk kondisi turun. Di bagian atas halaman ada running text harga saham agar pengguna bisa cepat melihat saham yang sedang bergerak naik atau turun.
-
-Di sidebar kiri, pengguna bisa mengatur saham, periode data, jenis grafik, alat bantu grafik, dan kalkulator risiko. Jika mode perbandingan dipakai, pengguna juga bisa memilih saham mana yang ingin dihitung di kalkulator risiko.
+---
 
 ## Mode Analisa
 
-### 1. Single Saham
+### Single Saham
 
-Mode ini dipakai untuk melihat satu saham secara lebih detail. Pengguna bisa memilih saham dari daftar yang tersedia atau mengetik ticker manual.
+Analisis lengkap untuk satu emiten. Pengguna bisa memilih dari daftar atau mengetik ticker manual.
 
-Yang ditampilkan antara lain:
+Yang ditampilkan:
+- Profil dan ringkasan bisnis perusahaan
+- Angka fundamental: market cap, P/E, PBV, ROE, DER, beta, dividen, 52-week high/low
+- Laporan keuangan tahunan dan histori dividen
+- Perbandingan sektoral dengan emiten sejenis
+- Harga terakhir, tertinggi/terendah periode, volume, RSI
+- Sinyal teknikal dan gambaran konsensus
+- Grafik harga utama dengan alat bantu grafik pilihan
+- Simulasi beli/jual (backtest)
+- Kalkulator risiko dan lot
+- Data historis 30 baris terakhir dengan ekspor CSV
 
-- cerita singkat perusahaan,
-- nilai perusahaan di bursa,
-- P/E atau perbandingan harga saham dengan laba,
-- dividen per tahun jika tersedia,
-- harga terakhir,
-- harga tertinggi dan terendah selama periode yang dipilih,
-- volume perdagangan,
-- perubahan harga selama periode,
-- gambaran cepat dari beberapa indikator,
-- simulasi cara beli/jual,
-- grafik harga dan alat bantu grafik.
+### Bandingkan Saham
 
-### 2. Bandingkan Saham
+Membandingkan 2 sampai 5 saham sekaligus. Pengguna bisa memilih dari daftar blue-chip atau mengetik ticker manual (pisah koma, maks 5).
 
-Mode ini dipakai untuk membandingkan beberapa saham sekaligus, maksimal 5 saham.
+Yang ditampilkan:
+- Grafik perbandingan perubahan harga, dinormalisasi ke basis 100%
+- Tabel ringkasan perbandingan antar saham
+- Grafik harga masing-masing saham di tab terpisah
+- Detail lengkap masing-masing saham
 
-Pengguna bisa memilih saham dari daftar yang tersedia di aplikasi atau mengetik ticker manual, misalnya:
-
-```text
-BBCA, BBRI, TLKM
-```
-
-Jika ticker manual tidak memakai `.JK`, aplikasi akan menambahkannya otomatis. Ini berlaku di mode Single Saham dan Bandingkan Saham.
-
-Contoh:
-
-```text
-BBCA
-```
-
-akan dibaca sebagai:
-
-```text
-BBCA.JK
-```
-
-Di mode ini, aplikasi menampilkan:
-
-- grafik perbandingan perubahan harga,
-- ringkasan perbandingan antar saham,
-- grafik harga masing-masing saham,
-- detail masing-masing saham di tab terpisah.
+---
 
 ## Periode Data
 
-Pilihan periode data tersedia di sidebar:
+| Pilihan        | Interval Data  |
+|----------------|----------------|
+| 1 Hari         | 5 menit        |
+| 1 Minggu       | 15 menit       |
+| 1 Bulan        | Harian         |
+| 3 Bulan        | Harian         |
+| 6 Bulan        | Harian         |
+| 1 Tahun        | Harian         |
+| 2 Tahun        | Harian         |
+| 5 Tahun        | Harian         |
 
-- 1 Hari dengan data 5 menit,
-- 1 Minggu dengan data 15 menit,
-- 1 Bulan,
-- 3 Bulan,
-- 6 Bulan,
-- 1 Tahun,
-- 2 Tahun,
-- 5 Tahun.
+Untuk simulasi beli/jual (backtest), gunakan periode minimal 6 Bulan agar indikator punya cukup data untuk membentuk sinyal yang valid.
 
-Untuk membaca simulasi beli/jual, sebaiknya gunakan periode yang lebih panjang seperti 6 Bulan, 1 Tahun, 2 Tahun, atau 5 Tahun. Periode yang terlalu pendek sering belum cukup untuk membentuk sinyal.
+---
 
 ## Jenis Grafik
 
-Aplikasi menyediakan beberapa jenis grafik:
+| Jenis                    | Keterangan                                                     |
+|--------------------------|----------------------------------------------------------------|
+| Candlestick              | Grafik standar OHLC berbentuk lilin                            |
+| Garis (Close)            | Garis harga penutupan saja                                     |
+| OHLC / Batang            | Grafik batang standar bursa                                    |
+| Heikin-Ashi              | Versi halus dari candlestick, lebih mudah baca tren            |
+| Renko                    | Grafik berbasis pergerakan harga, bukan waktu                  |
+| Point & Figure           | Hanya menampilkan pergerakan harga signifikan                  |
 
-- Candlestick,
-- Garis harga penutupan,
-- OHLC atau batang,
-- Heikin-Ashi,
-- Renko,
-- Point & Figure.
+Grafik Renko dan Point & Figure tidak menampilkan volume dan beberapa garis bantu karena tidak berbasis sumbu waktu.
 
-Untuk pengguna awam, grafik garis dan candlestick biasanya paling mudah dipahami.
-
-Grafik Renko dan Point & Figure tidak memakai alur waktu seperti grafik biasa. Karena itu, volume dan beberapa garis bantu otomatis tidak ditampilkan pada dua jenis grafik tersebut.
+---
 
 ## Alat Bantu Grafik
 
-Beberapa alat bantu yang tersedia:
+| Alat               | Fungsi                                                                 |
+|--------------------|------------------------------------------------------------------------|
+| MA 20              | Rata-rata harga 20 hari -- arah jangka pendek                          |
+| MA 50              | Rata-rata harga 50 hari -- arah jangka panjang                         |
+| Bollinger Bands    | Pita batas atas/bawah -- harga terlalu tinggi atau terlalu rendah      |
+| Garis Arah Harga   | Regresi linear -- kecenderungan harga naik, turun, atau datar          |
+| RSI (14)           | Momentum 0-100 -- overbought di atas 70, oversold di bawah 30         |
+| MACD (12,26,9)     | Kekuatan perubahan arah harga                                          |
+| Naik-Turun Harian  | Volatilitas harga harian dalam persentase                              |
+| Stochastic         | Potensi pembalikan arah di zona ekstrem                                |
+| OBV                | Apakah volume mendukung pergerakan harga                               |
+| ATR                | Lebar gerak harga rata-rata dalam periode tertentu                     |
 
-### MA 20 dan MA 50
+---
 
-Garis rata-rata harga. MA 20 melihat arah harga jangka pendek, sedangkan MA 50 melihat arah harga yang lebih panjang.
+## Sinyal Teknikal dan Gambaran Cepat
 
-### Bollinger Bands
+Sinyal teknikal dihitung dari RSI, MA Cross, MACD, dan Stochastic. Hasilnya digabungkan menjadi satu gambaran konsensus:
 
-Pita batas atas dan bawah untuk melihat apakah harga mulai terlalu tinggi atau terlalu rendah dibanding kebiasaannya.
+| Konsensus                  | Kondisi                                          |
+|----------------------------|--------------------------------------------------|
+| PELUANG BELI KUAT          | 75% atau lebih sinyal mengarah ke beli           |
+| CENDERUNG BISA BELI        | 50% atau lebih sinyal mengarah ke beli           |
+| TUNGGU DULU                | Sinyal campur aduk, mayoritas netral             |
+| CENDERUNG HATI-HATI        | 50% atau lebih sinyal mengarah ke jual           |
+| WASPADA, TEKANAN JUAL KUAT | 75% atau lebih sinyal mengarah ke jual           |
+| DATA BELUM CUKUP           | Data harga belum cukup panjang untuk dihitung    |
 
-### Garis Arah Harga
+Gambaran ini hanya alat bantu membaca grafik -- bukan jaminan arah harga.
 
-Garis bantu untuk melihat kecenderungan harga, apakah lebih condong naik, turun, atau datar.
+---
 
-### RSI
+## Simulasi Beli/Jual (Backtest)
 
-Membantu melihat apakah saham mulai terlalu ramai dibeli atau terlalu banyak dijual.
+Fitur ini mensimulasikan aturan beli/jual aplikasi pada data historis. Modal awal mengikuti nilai yang diisi di kalkulator risiko.
 
-### MACD
+Cara kerja:
+1. Aplikasi membaca data dari awal periode hingga akhir
+2. Setiap hari, minimal 4 indikator dicek: RSI, MA position, MACD crossover, Stochastic
+3. Jika minimal 2 tanda mengarah beli dan tidak ada tanda jual, posisi dibuka
+4. Jika minimal 2 tanda mengarah jual dan tidak ada tanda beli, posisi ditutup
+5. Stop-loss otomatis aktif jika harga turun 7% dari harga beli
 
-Membantu melihat perubahan tenaga naik atau turun.
+Yang ditampilkan:
+- Total return simulasi vs benchmark beli-tahan
+- Jumlah transaksi dan win rate
+- Penurunan terbesar selama simulasi (max drawdown)
+- Sharpe Ratio (target > 1.0)
+- Log transaksi beli dan jual
 
-### Naik-Turun Harian
+Biaya broker disertakan: 0.15% saat beli, 0.25% saat jual (standar BEI).
 
-Menampilkan seberapa besar harga biasa naik atau turun setiap hari.
+Simulasi masa lalu tidak menjamin hasil masa depan. Fitur ini untuk belajar dan memahami risiko, bukan untuk digunakan sebagai sinyal trading langsung.
 
-### Stochastic
+---
 
-Membantu melihat tanda awal apakah harga berpotensi mulai berbalik arah.
+## Kalkulator Risiko dan Lot
 
-### OBV
+Input:
+- Modal maksimal (Rp)
+- Harga beli per lembar (Rp)
+- Batas risiko (%)
 
-Membantu melihat apakah volume perdagangan mendukung arah harga.
+Output otomatis:
+- Jumlah lot maksimal yang bisa dibeli
+- Total dana yang digunakan
+- Harga stop-loss
+- Risiko dalam Rupiah
 
-### ATR
+Hasil berubah otomatis setiap kali input diubah, tanpa tombol kirim. Di mode Bandingkan Saham, pengguna bisa memilih saham mana yang dipakai untuk kalkulator ini.
 
-Menunjukkan seberapa lebar harga bergerak belakangan ini.
+---
 
-## Gambaran Cepat
+## Mode Offline
 
-Bagian Gambaran Cepat menggabungkan beberapa tanda dari grafik dan menampilkannya dalam bahasa sederhana.
+Jika tidak ada koneksi internet, aplikasi tidak crash. Sebaliknya, data ditampilkan dari cache lokal terakhir dengan banner pemberitahuan di bagian atas.
 
-Kemungkinan hasilnya:
+Cache disimpan di folder `cache/` dalam format CSV dan JSON, dan diperbarui otomatis setiap kali aplikasi berhasil mengunduh data. File cache tidak masuk ke repository git.
 
-- `PELUANG BELI KUAT`,
-- `CENDERUNG BISA BELI`,
-- `TUNGGU DULU`,
-- `CENDERUNG HATI-HATI`,
-- `WASPADA, TEKANAN JUAL KUAT`,
-- `DATA BELUM CUKUP`.
+Jenis data yang di-cache:
+- Data harga historis per ticker dan periode (cache 5 menit)
+- Data fundamental per ticker (cache 1 jam)
+- Laporan keuangan tahunan (cache 1 jam)
+- Histori dividen (cache 1 jam)
+- Data marquee running text (cache 5 menit)
 
-Gambaran ini hanya alat bantu membaca grafik. Hasilnya bukan jaminan harga akan naik atau turun.
-
-## Coba Simulasi Cara Beli/Jual
-
-Fitur ini digunakan untuk melihat bagaimana hasil aturan beli/jual aplikasi jika diterapkan pada data harga masa lalu. Modal awal simulasi mengikuti nilai `Modal Maksimal (Rp)` yang diisi di bagian `HITUNG RISIKO & LOT`.
-
-Cara kerjanya sederhana:
-
-1. Aplikasi membaca data harga dari awal periode sampai akhir periode.
-2. Setiap hari, aplikasi mengecek beberapa tanda dari grafik.
-3. Jika minimal 2 tanda mengarah ke beli dan tidak ada tanda jual, aplikasi pura-pura membeli saham.
-4. Jika minimal 2 tanda mengarah ke jual dan tidak ada tanda beli, aplikasi pura-pura menjual saham.
-5. Di akhir periode, aplikasi menghitung hasilnya.
-
-Bagian ini menampilkan:
-
-- hasil cara simulasi,
-- perbandingan dengan beli lalu simpan,
-- jumlah transaksi,
-- persentase transaksi yang untung,
-- penurunan terbesar selama simulasi,
-- catatan beli dan jual jika ada transaksi.
-
-Jika tidak ada transaksi, artinya selama periode tersebut aplikasi tidak menemukan momen beli/jual yang cukup kuat berdasarkan aturan yang dipakai.
-
-Simulasi masa lalu tidak menjamin hasil masa depan. Fitur ini lebih cocok dipakai untuk belajar dan memahami risiko.
-
-## Hitung Risiko dan Lot
-
-Di sidebar ada bagian `HITUNG RISIKO & LOT`.
-
-Input yang tersedia:
-
-- Modal Maksimal,
-- Harga Beli,
-- Batas Risiko.
-
-Hasil yang ditampilkan:
-
-- Maks Beli,
-- Dana Pakai,
-- Stop Loss,
-- Risiko dalam Rupiah.
-
-Bagian ini tidak memakai tombol. Hasil akan berubah otomatis setiap kali pengguna mengubah angka modal, harga beli, atau batas risiko. Pada mode Bandingkan Saham, pengguna bisa memilih saham yang mau dihitung melalui pilihan `Pilih Saham Kalkulator`.
-
-## Data Historis
-
-Di bagian bawah detail saham, pengguna bisa membuka data historis 30 baris terakhir. Data ini juga bisa diekspor ke CSV melalui tombol download yang tersedia di aplikasi.
+---
 
 ## Struktur File
 
-```bash
-├── app.py              # Tampilan utama Streamlit dan alur aplikasi
-├── data_loader.py      # Ambil data harga, profil perusahaan, dan konfigurasi
-├── config_saham.json   # Daftar saham, pilihan periode, sektor, dan cerita perusahaan
-├── charts.py           # Pembuatan grafik harga dan alat bantu grafik
-├── indicators.py       # Hitungan indikator, gambaran cepat, dan simulasi beli/jual
-├── requirements.txt    # Daftar library yang dibutuhkan
-└── README.md           # Dokumentasi aplikasi
 ```
+app.py              -- Tampilan utama Streamlit, sidebar, dan alur rendering
+data_loader.py      -- Pengambilan data dari yfinance dan manajemen cache lokal
+config_saham.json   -- Daftar saham, pilihan periode, terjemahan sektor, ringkasan perusahaan
+charts.py           -- Pembuatan grafik: candlestick, RSI, MACD, OBV, ATR, financial, dll
+indicators.py       -- Perhitungan indikator teknikal, sinyal konsensus, dan backtest engine
+requirements.txt    -- Daftar dependency Python
+cache/              -- Folder cache lokal (otomatis dibuat, tidak masuk git)
+README.md           -- Dokumentasi ini
+```
+
+---
 
 ## Cara Menjalankan
 
-### 1. Masuk ke folder project
+**1. Masuk ke folder project**
 
 ```bash
 cd saham
 ```
 
-### 2. Install dependency
+**2. Install dependency**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Jalankan aplikasi
+**3. Jalankan aplikasi**
 
 ```bash
 streamlit run app.py
 ```
 
-Setelah berjalan, aplikasi biasanya bisa dibuka di browser melalui:
+Buka browser dan akses:
 
-```text
+```
 http://localhost:8501
 ```
 
-## Catatan Data
+---
 
-Data diambil dari Yahoo Finance melalui `yfinance`.
+## Sumber Data
 
-Aplikasi memakai cache agar pengambilan data tidak terlalu sering:
+Semua data bersumber dari Yahoo Finance melalui library `yfinance`. Tidak ada API key yang diperlukan.
 
-- data harga diperbarui sekitar 5 menit sekali,
-- data profil perusahaan diperbarui sekitar 1 jam sekali.
+Cadence pembaruan:
+- Data harga dan marquee: setiap 5 menit
+- Data fundamental, laporan keuangan, dan dividen: setiap 1 jam
 
 Jika data tidak muncul, kemungkinan penyebabnya:
+- Koneksi internet bermasalah (cek mode offline di atas)
+- Kode ticker salah atau tidak tersedia di Yahoo Finance
+- Yahoo Finance sedang lambat atau down
+- Data saham tidak lengkap di Yahoo Finance
 
-- koneksi internet bermasalah,
-- ticker salah,
-- Yahoo Finance sedang lambat,
-- data saham tidak lengkap,
-- saham tidak tersedia di Yahoo Finance.
+---
+
+## Ticker Manual
+
+Format ticker untuk saham BEI cukup dengan kode saham tanpa akhiran `.JK`. Sistem akan menambahkan `.JK` secara otomatis.
+
+Contoh:
+```
+BBCA  -->  BBCA.JK
+TLKM  -->  TLKM.JK
+GOTO  -->  GOTO.JK
+```
+
+Untuk mode Bandingkan Saham dengan input manual, pisah ticker dengan koma:
+```
+BBCA, TLKM, BBRI, ASII
+```
+
+---
 
 ## Disclaimer
 
-Aplikasi ini dibuat untuk belajar dan membantu membaca data saham. Semua keputusan beli, jual, atau tahan saham tetap menjadi tanggung jawab masing-masing pengguna.
+Aplikasi ini dibuat untuk keperluan belajar dan membantu membaca data saham. Seluruh keputusan beli, jual, atau tahan saham tetap menjadi tanggung jawab masing-masing pengguna. Tidak ada yang dijamin dari informasi yang ditampilkan aplikasi ini.

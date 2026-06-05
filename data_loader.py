@@ -150,12 +150,12 @@ def ambil_data(ticker: str, periode: str) -> pd.DataFrame | None:
         df.index = index
         df = df.sort_index()
 
-        # Berhasil online → simpan ke cache
+        # Berhasil online -> simpan ke cache
         _simpan_cache_csv(df, cache_file)
         return df
 
     except Exception as e:
-        # Gagal online → coba baca cache
+        # Gagal online -> coba baca cache
         df_cache, cached_at = _baca_cache_csv(cache_file)
         if df_cache is not None and not df_cache.empty:
             _set_offline(f"data harga {periode}", ticker)
@@ -213,12 +213,12 @@ def ambil_fundamental(ticker: str) -> dict:
             "payout_ratio": info.get("payoutRatio"),
         }
 
-        # Berhasil online → simpan ke cache
+        # Berhasil online -> simpan ke cache
         _simpan_cache_json(result, cache_file)
         return result
 
     except Exception as exc:
-        # Gagal online → coba baca cache
+        # Gagal online -> coba baca cache
         data_cache, _ = _baca_cache_json(cache_file)
         if data_cache:
             _set_offline("fundamental", ticker)
@@ -262,7 +262,7 @@ def ambil_financial_history(ticker: str) -> pd.DataFrame | None:
             res = df_t[[rev_col, net_col]].copy()
             res.columns = ["Revenue", "Net_Income"]
             res = res.sort_index(ascending=True)
-            # Berhasil online → simpan ke cache
+            # Berhasil online -> simpan ke cache
             _simpan_cache_csv(res, cache_file)
             return res
         raise ValueError("Kolom Revenue/Net Income tidak ditemukan")
@@ -288,7 +288,7 @@ def ambil_dividend_history(ticker: str) -> pd.DataFrame | None:
         df_div.columns = ["Dividen"]
         df_div = df_div.sort_index(ascending=False)
 
-        # Berhasil online → simpan ke cache
+        # Berhasil online -> simpan ke cache
         _simpan_cache_csv(df_div, cache_file)
         return df_div
 
@@ -338,7 +338,7 @@ def ambil_data_marquee() -> list:
                 continue
 
         if marquee_items:
-            # Berhasil online → simpan ke cache
+            # Berhasil online -> simpan ke cache
             _simpan_cache_json(marquee_items, cache_file)
         return marquee_items
 

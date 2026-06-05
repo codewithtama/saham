@@ -275,25 +275,55 @@ def tampilkan_profil_perusahaan(fundamental, ticker):
     # Ringkasan angka utama dalam kotak sederhana
     st.markdown("**Angka Penting**")
     m1, m2, m3 = st.columns(3)
-    m1.metric("Nilai Perusahaan di Bursa", mc_str)
-    m2.metric("P/E (Harga vs Laba)", pe_str)
-    m3.metric("Dividen per Tahun", div_str)
+    m1.metric(
+        "Nilai Perusahaan di Bursa",
+        mc_str,
+        help="Market Capitalization — total nilai seluruh saham perusahaan dikalikan harga saat ini. Semakin besar, semakin besar ukuran perusahaannya.",
+    )
+    m2.metric(
+        "P/E (Harga vs Laba)",
+        pe_str,
+        help="Price-to-Earnings Ratio — berapa kali lipat harga saham dibanding laba per lembarnya. Angka tinggi bisa berarti saham mahal atau pasar optimis terhadap pertumbuhan.",
+    )
+    m3.metric(
+        "Dividen per Tahun",
+        div_str,
+        help="Dividend Yield — persentase dividen tahunan dibanding harga saham. Makin tinggi, makin besar uang tunai yang diterima investor tiap tahun.",
+    )
 
     m4, m5, m6 = st.columns(3)
     m4.metric(
-        "Naik Turun vs Pasar", f"{beta_val:.2f}" if beta_val else "Tidak tersedia"
+        "Naik Turun vs Pasar",
+        f"{beta_val:.2f}" if beta_val else "Tidak tersedia",
+        help="Beta — ukuran seberapa liar saham ini bergerak dibanding pasar (IHSG). Beta > 1 = bergerak lebih ekstrem dari pasar. Beta < 1 = lebih stabil.",
     )
     m5.metric(
-        "Harga Tertinggi 1 Tahun", f"Rp {h52_val:,.0f}" if h52_val else "Tidak tersedia"
+        "Harga Tertinggi 1 Tahun",
+        f"Rp {h52_val:,.0f}" if h52_val else "Tidak tersedia",
+        help="52-Week High — harga tertinggi yang pernah dicapai saham ini dalam 12 bulan terakhir.",
     )
     m6.metric(
-        "Harga Terendah 1 Tahun", f"Rp {l52_val:,.0f}" if l52_val else "Tidak tersedia"
+        "Harga Terendah 1 Tahun",
+        f"Rp {l52_val:,.0f}" if l52_val else "Tidak tersedia",
+        help="52-Week Low — harga terendah yang pernah dicapai saham ini dalam 12 bulan terakhir.",
     )
 
     m7, m8, m9 = st.columns(3)
-    m7.metric("P/B Ratio (PBV)", pbv_str)
-    m8.metric("Return on Equity (ROE)", roe_str)
-    m9.metric("Debt to Equity (DER)", der_str)
+    m7.metric(
+        "P/B Ratio (PBV)",
+        pbv_str,
+        help="Price-to-Book Value — perbandingan harga saham vs nilai buku aset bersih perusahaan. PBV < 1 bisa berarti saham diperdagangkan di bawah nilai asetnya.",
+    )
+    m8.metric(
+        "Return on Equity (ROE)",
+        roe_str,
+        help="Seberapa efisien perusahaan menghasilkan laba dari modal yang dimiliki pemegang saham. Makin tinggi makin baik — ROE > 15% umumnya dianggap bagus.",
+    )
+    m9.metric(
+        "Debt to Equity (DER)",
+        der_str,
+        help="Rasio utang terhadap modal sendiri. Makin tinggi, makin besar utang perusahaan dibanding modalnya. DER < 100% umumnya dianggap aman.",
+    )
 
     # Ringkasan Bisnis Ekspander
     with st.expander("Cerita Singkat Perusahaan"):
@@ -333,7 +363,11 @@ def tampilkan_analisis_fundamental_tambahan(ticker, fundamental):
         po_str = f"{po_val * 100:.2f}%" if po_val is not None else "Tidak tersedia"
         
         col_po, _ = st.columns([1, 2])
-        col_po.metric("Dividend Payout Ratio (DPR)", po_str)
+        col_po.metric(
+            "Dividend Payout Ratio (DPR)",
+            po_str,
+            help="Persentase laba bersih yang dibagikan sebagai dividen. DPR tinggi berarti perusahaan bagi-bagi lebih banyak ke pemegang saham, tapi menyisakan lebih sedikit untuk reinvestasi.",
+        )
         
         if df_div is not None and not df_div.empty:
             df_div_show = df_div.head(10).copy()
@@ -424,18 +458,37 @@ def tampilkan_metrik_dan_sinyal(df, ticker, timeframe):
         "Harga Terakhir",
         f"Rp {harga_kini:,.0f}",
         f"{perubahan:+,.0f} ({pct_perubahan:+.2f}%)",
+        help="Harga penutupan terakhir beserta perubahan dari sesi sebelumnya.",
     )
-    r1_c2.metric("Tertinggi Periode", f"Rp {float(df['High'].max()):,.0f}")
-    r1_c3.metric("Terendah Periode", f"Rp {float(df['Low'].min()):,.0f}")
+    r1_c2.metric(
+        "Tertinggi Periode",
+        f"Rp {float(df['High'].max()):,.0f}",
+        help="Harga tertinggi yang dicapai saham ini selama periode yang dipilih (timeframe).",
+    )
+    r1_c3.metric(
+        "Terendah Periode",
+        f"Rp {float(df['Low'].min()):,.0f}",
+        help="Harga terendah yang dicapai saham ini selama periode yang dipilih (timeframe).",
+    )
 
     # Row 2 -- Metrik Volume & Sinyal
     r2_c1, r2_c2, r2_c3 = st.columns(3)
-    r2_c1.metric("Volume", f"{vol_terakhir:,}", f"Rata-rata: {vol_avg:,}")
-    r2_c2.metric("Perubahan Selama Periode Ini", f"{return_total:+.2f}%")
+    r2_c1.metric(
+        "Volume",
+        f"{vol_terakhir:,}",
+        f"Rata-rata: {vol_avg:,}",
+        help="Jumlah lembar saham yang diperdagangkan pada sesi terakhir dibanding rata-rata periode ini. Volume tinggi mengkonfirmasi kekuatan pergerakan harga.",
+    )
+    r2_c2.metric(
+        "Perubahan Selama Periode Ini",
+        f"{return_total:+.2f}%",
+        help="Total persentase kenaikan atau penurunan harga dari awal hingga akhir periode yang dipilih.",
+    )
     r2_c3.metric(
         "RSI (14)",
         f"{rsi_val:.1f}",
         "Jenuh Beli" if rsi_val > 70 else ("Jenuh Jual" if rsi_val < 30 else "Netral"),
+        help="Relative Strength Index — indikator momentum 0–100. Di atas 70 berarti saham mulai jenuh beli (overbought), di bawah 30 berarti jenuh jual (oversold). Zona aman: 30–70.",
     )
 
     # Sinyal sederhana dari beberapa indikator
@@ -513,7 +566,10 @@ with st.sidebar:
     st.divider()
 
     mode = st.radio(
-        "Mau lihat apa?", ["Single Saham", "Bandingkan Saham (Maks 5)"], horizontal=True
+        "Mau lihat apa?",
+        ["Single Saham", "Bandingkan Saham (Maks 5)"],
+        horizontal=True,
+        help="Pilih 'Single Saham' untuk analisis lengkap satu emiten, atau 'Bandingkan' untuk melihat performa beberapa saham secara berdampingan.",
     )
     st.divider()
 
@@ -522,10 +578,19 @@ with st.sidebar:
     if mode == "Single Saham":
         st.markdown("**Pilih Saham Utama**")
         opsi_list = list(SAHAM_IDX.keys()) + ["Input Ticker Manual"]
-        pilihan1 = st.selectbox("Pilih Saham", opsi_list, key="s1")
+        pilihan1 = st.selectbox(
+            "Pilih Saham",
+            opsi_list,
+            key="s1",
+            help="Pilih salah satu emiten BEI dari daftar, atau pilih 'Input Ticker Manual' untuk memasukkan kode saham sendiri (format: KODE tanpa .JK).",
+        )
         if pilihan1 == "Input Ticker Manual":
             raw_input = (
-                st.text_input("Ticker (contoh: BBCA)", value="BBCA").upper().strip()
+                st.text_input(
+                    "Ticker (contoh: BBCA)",
+                    value="BBCA",
+                    help="Masukkan kode saham BEI tanpa akhiran .JK — contoh: BBCA, TLKM, GOTO. Sistem akan otomatis menambahkan .JK.",
+                ).upper().strip()
             )
             ticker1 = raw_input if raw_input.endswith(".JK") else raw_input + ".JK"
         else:
@@ -536,6 +601,7 @@ with st.sidebar:
         opsi_input = st.selectbox(
             "Metode Pemilihan",
             ["Pilih dari Daftar Blue-Chip", "Ketik Ticker Manual (Pisah Koma)"],
+            help="Pilih cara memilih saham pembanding: dari daftar blue-chip yang sudah tersedia, atau ketik sendiri kode saham yang ingin dibandingkan.",
         )
 
         if opsi_input == "Pilih dari Daftar Blue-Chip":
@@ -544,19 +610,26 @@ with st.sidebar:
                 options=list(SAHAM_IDX.keys()),
                 default=[list(SAHAM_IDX.keys())[0], list(SAHAM_IDX.keys())[4]],
                 max_selections=5,
+                help="Pilih 2–5 saham untuk dibandingkan. Grafik akan menampilkan pergerakan harga semua saham dalam satu tampilan yang dinormalisasi ke 100%.",
             )
             tickers = [SAHAM_IDX[p] for p in pilihan_saham]
         else:
             raw_input = st.text_input(
                 "Ticker Manual (maks 5, pisah koma. Contoh: BBCA, TLKM, BBRI)",
                 value="BBCA, TLKM",
+                help="Ketik kode saham BEI yang ingin dibandingkan, pisah dengan koma. Maksimal 5 saham. Contoh: BBCA, TLKM, BBRI, ASII, GOTO",
             )
             manual_list = [t.strip().upper() for t in raw_input.split(",") if t.strip()]
             tickers = [t if t.endswith(".JK") else t + ".JK" for t in manual_list][:5]
 
     st.divider()
     st.markdown("**Timeframe**")
-    timeframe = st.selectbox("Periode", list(TIMEFRAME_OPTIONS.keys()), index=2)
+    timeframe = st.selectbox(
+        "Periode",
+        list(TIMEFRAME_OPTIONS.keys()),
+        index=2,
+        help="Rentang waktu data historis yang ditampilkan. '1 Hari' dan '5 Hari' menampilkan data per jam/menit (intraday). '1 Bulan' ke atas menggunakan data harian.",
+    )
 
     st.divider()
     st.markdown("**Tampilan Grafik**")
@@ -569,7 +642,10 @@ with st.sidebar:
         "Point & Figure (P&F)": "pnf",
     }
     pilihan_grafik = st.selectbox(
-        "Tipe Grafik Utama", list(opsi_grafik.keys()), index=0
+        "Tipe Grafik Utama",
+        list(opsi_grafik.keys()),
+        index=0,
+        help="Candlestick: batang lilin standar (Open/High/Low/Close). Heikin-Ashi: versi halus untuk melihat tren. Renko: grafik berbasis pergerakan harga bukan waktu. P&F: hanya menampilkan perubahan harga signifikan.",
     )
     tipe_grafik = opsi_grafik[pilihan_grafik]
 
@@ -640,7 +716,7 @@ marquee_data = ambil_data_marquee()
 if marquee_data:
     ticker_html_items = []
     for item in marquee_data:
-        arrow = "▲" if item["change"] > 0 else ("▼" if item["change"] < 0 else "■")
+        arrow = "+" if item["change"] > 0 else ("-" if item["change"] < 0 else "~")
         color_hex = (
             "#00ff00"
             if item["change"] > 0
@@ -742,7 +818,7 @@ if st.session_state.get("offline_mode"):
         font-family: 'JetBrains Mono', monospace;
         font-size: 12px;
     ">
-        <span style="color: #ffa500; font-weight: bold; font-size: 13px;">⚠ MODE OFFLINE</span>
+        <span style="color: #ffa500; font-weight: bold; font-size: 13px;">[OFFLINE]</span>
         <span style="color: #c9d1d9; margin-left: 10px;">Tidak ada koneksi internet — menampilkan data cache terakhir.</span>
         <div style="color: #8b949e; margin-top: 5px;">
             Cache dari: <span style="color: #ffa500;">{ts_str} WIB</span>
@@ -973,7 +1049,7 @@ st.caption(
 )
 waktu_wib = datetime.now(ZoneInfo("Asia/Jakarta"))
 if st.session_state.get("offline_mode"):
-    st.caption("⚠ MODE OFFLINE — Data yang ditampilkan berasal dari cache lokal, bukan data real-time.")
+    st.caption("[OFFLINE] Data yang ditampilkan berasal dari cache lokal, bukan data real-time.")
 else:
     st.caption(
         f"Data diperbarui setiap 5 menit -- Terakhir diambil: {waktu_wib.strftime('%d %b %Y %H:%M WIB')}"
