@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date, datetime
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -254,7 +254,8 @@ def hitung_portfolio_summary(entries: list[dict]) -> pd.DataFrame:
     BROKER_SELL = 0.0025
 
     def _get_price(ticker: str) -> float | None:
-        df = ambil_data(ticker, "5d")
+        # Gunakan "1mo" (data harian) bukan "5d" (intraday 15m yang bisa kosong diluar jam bursa)
+        df = ambil_data(ticker, "1mo")
         if df is None or df.empty:
             return None
         return float(df["Close"].iloc[-1])
