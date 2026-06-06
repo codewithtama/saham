@@ -211,6 +211,8 @@ def ambil_fundamental(ticker: str) -> dict:
             "eps": info.get("trailingEps"),
             "bvps": info.get("bookValue"),
             "payout_ratio": info.get("payoutRatio"),
+            "ex_dividend_date": info.get("exDividendDate"),   # Unix timestamp
+            "dividend_date": info.get("dividendDate"),         # Unix timestamp (payment)
         }
 
         # Berhasil online -> simpan ke cache
@@ -380,3 +382,88 @@ def ambil_kurs_usd_idr() -> dict | None:
             _set_offline("kurs USD/IDR")
             return data_cache
         return None
+
+
+@st.cache_data(ttl=300)
+def ambil_indeks_pasar() -> list[dict]:
+    """
+    Ambil harga dan % change harian IHSG (^JKSE) dan LQ45 (^JKLQ45).
+    Return list of dict: [{kode, harga, change_pct}, ...]
+    """
+    cache_file = "indeks_pasar.json"
+    indeks = {"IHSG": "^JKSE", "LQ45": "^JKLQ45"}
+    try:
+        tickers_str = " ".join(indeks.values())
+        df_all = yf.download(tickers_str, period="2d", interval="1d", auto_adjust=True, progress=False)
+        if df_all.empty:
+            raise ValueError("Data indeks kosong")
+
+        result = []
+        for label, ticker_idx in indeks.items():
+            try:
+                if isinstance(df_all.columns, pd.MultiIndex):
+                    df_idx = df_all.xs(ticker_idx, axis=1, level=1).dropna(how="all")
+                else:
+                    df_idx = df_all.dropna(how="all")
+
+                df_idx = df_idx.dropna(subset=["Close"])
+                if df_idx.empty:
+                    continue
+                harga = float(df_idx["Close"].iloc[-1])
+                prev = float(df_idx["Close"].iloc[-2]) if len(df_idx) >= 2 else harga
+                chg = ((harga - prev) / prev) * 100 if prev > 0 else 0.0
+                result.append({"kode": label, "harga": harga, "change_pct": chg})
+            except Exception:
+                continue
+
+        if result:
+            _simpan_cache_json(result, cache_file)
+        return result
+
+    except Exception:
+        data_cache, _ = _baca_cache_json(cache_file)
+        if data_cache:
+            _set_offline("indeks pasar")
+            return data_cache
+        return []
+
+
+@st.cache_data(ttl=1800)
+def ambil_berita(ticker: str) -> list[dict]:
+    """
+    Ambil berita terbaru untuk ticker dari Yahoo Finance.
+    Return list of dict: [{title, publisher, link, waktu_str}, ...]
+    Maks 8 berita. Fallback ke cache lokal.
+    """
+    cache_file = f"news_{ticker.replace('.', '_')}.json"
+    try:
+        t = yf.Ticker(ticker)
+        raw_news = t.news
+        if not raw_news:
+            raise ValueError("Tidak ada berita")
+
+        result = []
+        for item in raw_news[:8]:
+            ts = item.get("providerPublishTime", 0)
+            try:
+                from zoneinfo import ZoneInfo
+                waktu = datetime.fromtimestamp(ts, tz=ZoneInfo("Asia/Jakarta"))
+                waktu_str = waktu.strftime("%d %b %Y %H:%M WIB")
+            except Exception:
+                waktu_str = "-"
+
+            result.append({
+                "title": item.get("title", "Tanpa Judul"),
+                "publisher": item.get("publisher", "Unknown"),
+                "link": item.get("link", "#"),
+                "waktu_str": waktu_str,
+            })
+
+        _simpan_cache_json(result, cache_file)
+        return result
+
+    except Exception:
+        data_cache, _ = _baca_cache_json(cache_file)
+        if data_cache:
+            return data_cache
+        return []

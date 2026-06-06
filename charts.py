@@ -749,3 +749,70 @@ def buat_financial_chart(df_fin: pd.DataFrame, ticker: str) -> plt.Figure:
     
     plt.tight_layout()
     return fig
+
+
+def buat_korelasi_chart(tickers: list[str], dfs: list[pd.DataFrame]) -> plt.Figure:
+    """
+    Render heatmap korelasi return harian antar ticker.
+    Hanya muncul kalau setiap df punya >= 30 baris.
+    """
+    # Bangun DataFrame return harian tiap ticker
+    returns_dict = {}
+    for ticker, df in zip(tickers, dfs):
+        kode = ticker.replace(".JK", "")
+        ret = df["Close"].pct_change().dropna()
+        returns_dict[kode] = ret
+
+    df_ret = pd.DataFrame(returns_dict).dropna()
+    if df_ret.empty or len(df_ret) < 5:
+        fig, ax = plt.subplots(figsize=(5, 3), facecolor="#000000")
+        ax.set_facecolor("#000000")
+        ax.text(0.5, 0.5, "Data tidak cukup untuk hitung korelasi",
+                ha="center", va="center", color="#8b949e", fontsize=10, transform=ax.transAxes)
+        ax.axis("off")
+        return fig
+
+    corr = df_ret.corr()
+    n = len(corr)
+
+    fig, ax = plt.subplots(figsize=(max(5, n * 1.8), max(4, n * 1.6)), facecolor="#000000")
+    ax.set_facecolor("#000000")
+
+    # Bangun colormap manual: merah (#ff1744) untuk -1, hitam untuk 0, hijau (#00e676) untuk +1
+    cmap = plt.cm.RdYlGn
+
+    im = ax.imshow(corr.values, cmap=cmap, vmin=-1, vmax=1, aspect="auto")
+
+    # Label sumbu
+    labels = corr.columns.tolist()
+    ax.set_xticks(range(n))
+    ax.set_yticks(range(n))
+    ax.set_xticklabels(labels, color="#c9d1d9", fontsize=9, fontweight="bold")
+    ax.set_yticklabels(labels, color="#c9d1d9", fontsize=9, fontweight="bold")
+    ax.tick_params(colors="#8b949e", labelsize=9)
+
+    # Annotasi nilai di setiap sel
+    for i in range(n):
+        for j in range(n):
+            val = corr.values[i, j]
+            txt_color = "#000000" if abs(val) > 0.5 else "#ffffff"
+            ax.text(j, i, f"{val:.2f}", ha="center", va="center",
+                    color=txt_color, fontsize=9, fontweight="bold")
+
+    # Colorbar tipis
+    cbar = fig.colorbar(im, ax=ax, fraction=0.035, pad=0.04)
+    cbar.ax.yaxis.set_tick_params(color="#8b949e", labelsize=7)
+    plt.setp(cbar.ax.yaxis.get_ticklabels(), color="#8b949e")
+
+    for spine in ax.spines.values():
+        spine.set_color("#222222")
+
+    ax.set_title(
+        "Korelasi Return Harian Antar Saham",
+        color="#ffa500", fontsize=10, loc="left", fontweight="bold", pad=10
+    )
+    ax.set_xlabel("(+1 = bergerak bersama, -1 = berlawanan, 0 = tidak berhubungan)",
+                  color="#8b949e", fontsize=7.5)
+
+    plt.tight_layout()
+    return fig

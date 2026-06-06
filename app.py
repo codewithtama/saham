@@ -28,6 +28,7 @@ from charts import (
     buat_atr_chart,
     buat_candlestick,
     buat_compare_chart,
+    buat_korelasi_chart,
     buat_macd_chart,
     buat_obv_chart,
     buat_rsi_chart,
@@ -38,11 +39,13 @@ from charts import (
 from data_loader import (
     SAHAM_IDX,
     TIMEFRAME_OPTIONS,
+    ambil_berita,
     ambil_data,
     ambil_data_marquee,
     ambil_fundamental,
     ambil_financial_history,
     ambil_dividend_history,
+    ambil_indeks_pasar,
     ambil_kurs_usd_idr,
 )
 from features import (
@@ -214,6 +217,21 @@ st.markdown(
         border-radius: 0px !important;
         padding: 10px;
         min-width: 0 !important;
+    }
+    /* Mengatasi luapan font pada metric (Zero Overflowed Policy) */
+    div[data-testid="metric-container"] [data-testid="stMetricValue"] {
+        font-size: 1.45rem !important;
+        font-weight: 700 !important;
+        font-family: 'JetBrains Mono', monospace !important;
+    }
+    div[data-testid="metric-container"] [data-testid="stMetricLabel"] {
+        font-size: 0.8rem !important;
+        color: #8b949e !important;
+        font-family: 'JetBrains Mono', monospace !important;
+    }
+    div[data-testid="metric-container"] [data-testid="stMetricDelta"] {
+        font-size: 0.8rem !important;
+        font-family: 'JetBrains Mono', monospace !important;
     }
 
     /* Kotak tanda beli/jual/tunggu */
@@ -404,12 +422,49 @@ def tampilkan_analisis_fundamental_tambahan(ticker, fundamental):
         po_val = fundamental.get("payout_ratio")
         po_str = f"{po_val * 100:.2f}%" if po_val is not None else "Tidak tersedia"
         
-        col_po, _ = st.columns([1, 2])
+        # Format ex-dividend dan payment date
+        def format_epoch(epoch_val):
+            if not epoch_val:
+                return "-"
+            if isinstance(epoch_val, (datetime, pd.Timestamp)):
+                return epoch_val.strftime("%d %b %Y")
+            try:
+                val = float(epoch_val)
+                if val > 2e11: 
+                    val = val / 1000
+                return datetime.fromtimestamp(val, tz=ZoneInfo("Asia/Jakarta")).strftime("%d %b %Y")
+            except Exception:
+                return str(epoch_val)
+        
+        ex_date_formatted = format_epoch(fundamental.get("ex_dividend_date"))
+        pay_date_formatted = format_epoch(fundamental.get("dividend_date"))
+        
+        col_po, col_dates = st.columns([1, 2])
         col_po.metric(
             "Dividend Payout Ratio (DPR)",
             po_str,
             help="Persentase laba bersih yang dibagikan sebagai dividen. DPR tinggi berarti perusahaan bagi-bagi lebih banyak ke pemegang saham, tapi menyisakan lebih sedikit untuk reinvestasi.",
         )
+        
+        with col_dates:
+            st.markdown(
+                f"""
+                <div style="background-color: #0d0d0d; border: 1px solid #333333; padding: 10px; border-radius: 0px; font-family: 'JetBrains Mono', monospace; font-size: 11px;">
+                    <div style="color: #ffa500; font-weight: bold; margin-bottom: 5px;">📅 JADWAL DIVIDEN TERKINI</div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                        <span style="color: #8b949e;">Ex-Dividend Date:</span>
+                        <span style="color: #ffffff; font-weight: bold;">{ex_date_formatted}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #8b949e;">Payment Date:</span>
+                        <span style="color: #ffffff; font-weight: bold;">{pay_date_formatted}</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            
+        st.write("") # Spacer
         
         if df_div is not None and not df_div.empty:
             df_div_show = df_div.head(10).copy()
@@ -421,6 +476,39 @@ def tampilkan_analisis_fundamental_tambahan(ticker, fundamental):
             )
         else:
             st.info("Histori pembagian dividen tidak tersedia untuk emiten ini.")
+
+
+def tampilkan_berita(ticker: str):
+    st.subheader("Berita Terbaru")
+    with st.spinner("Mengambil berita..."):
+        news_items = ambil_berita(ticker)
+    if news_items:
+        for item in news_items:
+            st.markdown(
+                f"""
+                <div style="
+                    background-color: #0d0d0d;
+                    border: 1px solid #222222;
+                    padding: 12px;
+                    border-radius: 0px;
+                    margin-bottom: 8px;
+                ">
+                    <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">
+                        <a href="{item['link']}" target="_blank" style="color: #ffa500; text-decoration: none;">
+                            {item['title']}
+                        </a>
+                    </div>
+                    <div style="color: #8b949e; font-size: 10px; font-family: 'JetBrains Mono', monospace;">
+                        Penerbit: <span style="color: #ffffff;">{item['publisher']}</span>
+                        &nbsp;|&nbsp; Rilis: <span style="color: #ffffff;">{item['waktu_str']}</span>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    else:
+        st.info("Tidak ada berita terbaru yang tersedia untuk emiten ini dari Yahoo Finance.")
+
 
 
 def tampilkan_peer_group_analysis(ticker, fundamental):
@@ -757,9 +845,10 @@ with st.sidebar:
 # ========================================
 st.title("ANALISA SAHAM BEI/IDX")
 
-# Ambil data bursa marquee dan kurs USD/IDR secara paralel
+# Ambil data bursa marquee, kurs USD/IDR, dan indeks pasar secara paralel
 marquee_data = ambil_data_marquee()
 kurs_data = ambil_kurs_usd_idr()
+indeks_data = ambil_indeks_pasar()
 
 if marquee_data:
     ticker_html_items = []
@@ -776,6 +865,20 @@ if marquee_data:
             f'<span style="color:#8b949e; font-size:10px;">USD/IDR</span> '
             f'<span style="color:#ffa500; margin-left:4px;">{kurs_val:,.0f}</span> '
             f'<span style="color:{kurs_color}; margin-left:4px;">{kurs_arrow} {abs(kurs_chg):.2f}%</span>'
+            f'</span>'
+            f'<span class="ticker-divider"></span>'
+        )
+
+    # -- Chip IHSG dan LQ45 --
+    for idx_item in indeks_data:
+        idx_chg = idx_item["change_pct"]
+        idx_arrow = "+" if idx_chg > 0 else ("-" if idx_chg < 0 else "~")
+        idx_color = "#00ff00" if idx_chg > 0 else ("#ff3333" if idx_chg < 0 else "#8b949e")
+        ticker_html_items.append(
+            f'<span class="ticker-kurs">'
+            f'<span style="color:#8b949e; font-size:10px;">{idx_item["kode"]}</span> '
+            f'<span style="color:#ffa500; margin-left:4px;">{idx_item["harga"]:,.2f}</span> '
+            f'<span style="color:{idx_color}; margin-left:4px;">{idx_arrow} {abs(idx_chg):.2f}%</span>'
             f'</span>'
             f'<span class="ticker-divider"></span>'
         )
@@ -962,6 +1065,15 @@ with tab_analisa:
 
         st.divider()
 
+        # 2b. Korelasi antar saham
+        st.subheader("Korelasi Return Harian")
+        fig_corr = buat_korelasi_chart(valid_tickers, dfs)
+        st.pyplot(fig_corr, use_container_width=True)
+        plt.close(fig_corr)
+        st.caption("Dihitung dari return harian (pct_change) dalam periode yang dipilih. Diagonal selalu 1.00 (korelasi saham dengan dirinya sendiri).")
+
+        st.divider()
+
         # 3. Grafik utama per saham
         st.subheader("Grafik Harga Utama")
         tab_charts = st.tabs([f"Grafik {t}" for t in valid_tickers])
@@ -1033,6 +1145,9 @@ with tab_analisa:
                     st.divider()
 
                 tampilkan_data_historis(d, t)
+                st.divider()
+                tampilkan_berita(t)
+
 
     else:
         # ----------------------------------------
@@ -1110,6 +1225,9 @@ with tab_analisa:
             plt.close(fig_atr)
 
         tampilkan_data_historis(df_utama, t_utama)
+        st.divider()
+        tampilkan_berita(t_utama)
+
 
 
 # ========================================
@@ -1298,6 +1416,17 @@ with tab_portfolio:
                 "Modal (Rp)", "Nilai Kini (Rp)", "P/L (Rp)", "P/L (%)", "Tgl Beli"
             ]
             st.dataframe(df_pf[tampil_cols], use_container_width=True, hide_index=True)
+
+            # Export portfolio ke CSV
+            csv_data = df_pf[tampil_cols].to_csv(index=False).encode('utf-8')
+            now_str = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%Y%m%d")
+            st.download_button(
+                label="📥 Export Portfolio ke CSV",
+                data=csv_data,
+                file_name=f"portfolio_{now_str}.csv",
+                mime="text/csv",
+                key="btn_pf_export"
+            )
 
             st.divider()
             st.markdown("**Hapus Posisi:**")
