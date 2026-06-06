@@ -12,7 +12,6 @@ Dashboard analisis saham Indonesia berbasis Streamlit. Data harga, profil perusa
   - Angka fundamental: Market Cap, P/E Ratio, PBV, ROE, DER, Beta, dan Dividend Yield.
   - Grafik laporan keuangan tahunan (Revenue vs Net Income) dan riwayat dividen.
   - **Jadwal Dividen Terkini**: Menampilkan *Ex-Dividend Date* dan *Payment Date* dengan format tanggal lokal WIB.
-  - **Berita Terbaru Saham**: Menampilkan artikel berita terhangat dengan mekanisme pertahanan bertingkat (*multi-stage fallback*) dari keyword search hingga berita pasar umum IHSG (`^JKSE`).
   - **Sinyal Teknikal & Konsensus**: Konsensus sinyal instan (Beli Kuat, Beli, Tunggu, Hati-hati, Jual) berdasarkan akumulasi indikator RSI, MA Cross, MACD, dan Stochastic.
   - Grafik interaktif (Candlestick, Line, OHLC, Heikin-Ashi, Renko, P&F) dengan support & resistance otomatis dari swing high/low.
 - **Bandingkan Saham (Maks 5)**:

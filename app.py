@@ -39,7 +39,6 @@ from charts import (
 from data_loader import (
     SAHAM_IDX,
     TIMEFRAME_OPTIONS,
-    ambil_berita,
     ambil_data,
     ambil_data_marquee,
     ambil_fundamental,
@@ -480,92 +479,6 @@ def tampilkan_analisis_fundamental_tambahan(ticker, fundamental):
             )
         else:
             st.info("Histori pembagian dividen tidak tersedia untuk emiten ini.")
-
-
-def tampilkan_berita(ticker: str):
-    st.subheader("Berita Terbaru")
-    with st.spinner("Mengambil berita..."):
-        news_items = ambil_berita(ticker)
-    if news_items:
-        # Tampilkan info jika ini fallback berita pasar
-        first_item = news_items[0]
-        if first_item.get("is_fallback"):
-            st.caption(f"ℹ️ Menampilkan berita dari: **{first_item.get('fallback_label', 'Konteks Pasar')}** (karena berita spesifik emiten ini tidak ditemukan)")
-            
-        for item in news_items:
-            st.markdown(
-                f"""
-                <div style="
-                    background-color: #0d0d0d;
-                    border: 1px solid #222222;
-                    padding: 12px;
-                    border-radius: 0px;
-                    margin-bottom: 8px;
-                ">
-                    <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">
-                        <a href="{item['link']}" target="_blank" class="news-card-link">
-                            {item['title']}
-                        </a>
-                    </div>
-                    <div style="color: #8b949e; font-size: 10px; font-family: 'JetBrains Mono', monospace;">
-                        Penerbit: <span style="color: #ffffff;">{item['publisher']}</span>
-                        &nbsp;|&nbsp; Rilis: <span style="color: #ffffff;">{item['waktu_str']}</span>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-    else:
-        st.info("Tidak ada berita terbaru yang tersedia untuk emiten ini dari Yahoo Finance.")
-
-
-
-
-def tampilkan_peer_group_analysis(ticker, fundamental):
-    sektor = fundamental.get("sektor")
-    if not sektor:
-        return
-        
-    st.markdown(f"### Perbandingan Sektoral ({sektor})")
-    
-    from features import ambil_semua_fundamental_raw
-    df_all = ambil_semua_fundamental_raw()
-    if df_all.empty:
-        st.info("Data perbandingan sektoral tidak tersedia.")
-        return
-        
-    # Ambil baris dengan sektor yang sama
-    df_sec = df_all[df_all["Sektor"] == sektor].copy()
-    
-    clean_ticker = ticker.replace(".JK", "")
-    df_main = df_sec[df_sec["Kode"] == clean_ticker].copy()
-    df_others = df_sec[df_sec["Kode"] != clean_ticker].copy()
-    
-    # Batasi peer maksimal 4, urutkan berdasarkan Market Cap terbesar
-    df_others = df_others.sort_values("_market_cap", ascending=False).head(4)
-    
-    df_final = pd.concat([df_main, df_others]).reset_index(drop=True)
-    
-    rows = []
-    for _, row in df_final.iterrows():
-        display_ticker = row["Kode"]
-        if display_ticker == clean_ticker:
-            display_ticker = f"{display_ticker} (Aktif)"
-            
-        rows.append({
-            "Kode": display_ticker,
-            "Perusahaan": row["Nama"],
-            "Market Cap": row["Market Cap"],
-            "P/E Ratio": f"{row['P/E']:.2f}x" if row["P/E"] > 0 else "N/A",
-            "PBV Ratio": f"{row['PBV']:.2f}x" if row["PBV"] > 0 else "N/A",
-            "ROE": f"{row['ROE (%)']:.2f}%" if row["ROE (%)"] > 0 else "N/A",
-            "DER": f"{row['DER (%)']:.2f}%" if row["DER (%)"] > 0 else "N/A",
-            "Div Yield": f"{row['Div Yield (%)']:.2f}%" if row["Div Yield (%)"] > 0 else "N/A"
-        })
-        
-    df_peers = pd.DataFrame(rows)
-    st.dataframe(df_peers.set_index("Kode"), use_container_width=True)
-
 
 
 def tampilkan_metrik_dan_sinyal(df, ticker, timeframe):
@@ -1098,8 +1011,7 @@ with tab_analisa:
                 st.divider()
                 tampilkan_analisis_fundamental_tambahan(t, f)
                 st.divider()
-                tampilkan_peer_group_analysis(t, f)
-                st.divider()
+
 
                 if show_rsi:
                     st.subheader("RSI -- Apakah Saham Mulai Terlalu Mahal/Murah?")
@@ -1144,8 +1056,6 @@ with tab_analisa:
                     st.divider()
 
                 tampilkan_data_historis(d, t)
-                st.divider()
-                tampilkan_berita(t)
 
 
     else:
@@ -1160,8 +1070,7 @@ with tab_analisa:
         st.divider()
         tampilkan_analisis_fundamental_tambahan(t_utama, fund_utama)
         st.divider()
-        tampilkan_peer_group_analysis(t_utama, fund_utama)
-        st.divider()
+
         tampilkan_metrik_dan_sinyal(df_utama, t_utama, timeframe)
         st.divider()
 
@@ -1224,8 +1133,6 @@ with tab_analisa:
             plt.close(fig_atr)
 
         tampilkan_data_historis(df_utama, t_utama)
-        st.divider()
-        tampilkan_berita(t_utama)
 
 
 
