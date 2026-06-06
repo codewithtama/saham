@@ -71,6 +71,17 @@ def _fetch_ticker(ticker: str, periode: str) -> tuple[str, object, dict]:
     return ticker, df_t, fund_t
 
 
+@st.cache_data(ttl=3600)
+def _ambil_sektor_list() -> list[str]:
+    """Bangun daftar sektor unik dari semua ticker SAHAM_IDX. Di-cache 1 jam."""
+    sektors: set[str] = set()
+    for ticker in SAHAM_IDX.values():
+        fund = ambil_fundamental(ticker)
+        if fund and fund.get("sektor"):
+            sektors.add(fund["sektor"])
+    return ["Semua"] + sorted(sektors)
+
+
 # ========================================
 # KONFIGURASI HALAMAN
 # ========================================
@@ -1108,13 +1119,8 @@ with tab_screener:
     st.subheader("Stock Screener")
     st.caption("Filter saham dari daftar SAHAM_IDX berdasarkan kriteria fundamental.")
 
-    # Kumpulkan daftar sektor unik dari cache fundamental yang ada
-    semua_sektor: set[str] = set()
-    for _nama_scr, _tick_scr in SAHAM_IDX.items():
-        _f_scr = ambil_fundamental(_tick_scr)
-        if _f_scr and _f_scr.get("sektor"):
-            semua_sektor.add(_f_scr["sektor"])
-    opsi_sektor = ["Semua"] + sorted(semua_sektor)
+    # Bangun daftar sektor dari cache (tidak re-fetch setiap render)
+    opsi_sektor = _ambil_sektor_list()
 
     col_f1, col_f2, col_f3 = st.columns(3)
     with col_f1:
@@ -1176,7 +1182,7 @@ with tab_watchlist:
         with st.spinner("Memuat harga terkini watchlist..."):
             for _tick_wl in wl:
                 _kode_wl = _tick_wl.replace(".JK", "")
-                _df_wl = ambil_data(_tick_wl, "5d")
+                _df_wl = ambil_data(_tick_wl, "1mo")  # daily data, reliable diluar jam bursa
                 _fund_wl = ambil_fundamental(_tick_wl)
                 _harga = f"Rp {float(_df_wl['Close'].iloc[-1]):,.0f}" if _df_wl is not None and not _df_wl.empty else "N/A"
                 _chg = "N/A"
