@@ -41,6 +41,7 @@ from data_loader import (
     ambil_fundamental,
     ambil_financial_history,
     ambil_dividend_history,
+    ambil_kurs_usd_idr,
 )
 from indicators import (
     hitung_konsensus_sinyal,
@@ -94,17 +95,17 @@ st.markdown(
         margin-left: calc(-50vw + 50%);
         overflow: hidden;
         background-color: #060606;
-        border-top: 1px solid #1c1c1c;
-        border-bottom: 1px solid #1c1c1c;
-        padding: 8px 0;
+        border-top: 1px solid #2a2a2a;
+        border-bottom: 1px solid #2a2a2a;
+        padding: 11px 0;
         box-sizing: border-box;
         margin-bottom: 15px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.9);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.95);
     }
     .ticker-moving {
         display: flex;
         width: max-content;
-        animation: scroll-left 45s linear infinite;
+        animation: scroll-left 55s linear infinite;
     }
     .ticker-moving:hover {
         animation-play-state: paused;
@@ -114,11 +115,29 @@ st.markdown(
         align-items: center;
     }
     .ticker-item {
-        font-size: 11px;
+        font-size: 12px;
         font-family: 'JetBrains Mono', 'Consolas', monospace !important;
         font-weight: bold;
         white-space: nowrap;
-        margin-right: 40px;
+        margin-right: 52px;
+    }
+    .ticker-kurs {
+        font-size: 12px;
+        font-family: 'JetBrains Mono', 'Consolas', monospace !important;
+        font-weight: bold;
+        white-space: nowrap;
+        margin-right: 52px;
+        padding: 2px 10px;
+        border-left: 2px solid #ffa500;
+        border-right: 2px solid #333;
+    }
+    .ticker-divider {
+        width: 1px;
+        height: 18px;
+        background: #333;
+        margin-right: 52px;
+        display: inline-block;
+        vertical-align: middle;
     }
 
     /* ==========================================================
@@ -710,10 +729,29 @@ with st.sidebar:
 # ========================================
 st.title("ANALISA SAHAM BEI/IDX")
 
-# Ambil data bursa marquee secara efisien (konkuren & cached)
+# Ambil data bursa marquee dan kurs USD/IDR secara paralel
 marquee_data = ambil_data_marquee()
+kurs_data = ambil_kurs_usd_idr()
+
 if marquee_data:
     ticker_html_items = []
+
+    # -- Chip kurs USD/IDR di posisi pertama --
+    if kurs_data:
+        kurs_val = kurs_data["kurs"]
+        kurs_chg = kurs_data["change_pct"]
+        kurs_arrow = "+" if kurs_chg > 0 else ("-" if kurs_chg < 0 else "~")
+        # Rupiah melemah = dolar naik = merah untuk investor saham
+        kurs_color = "#ff3333" if kurs_chg > 0 else ("#00ff00" if kurs_chg < 0 else "#8b949e")
+        ticker_html_items.append(
+            f'<span class="ticker-kurs">'
+            f'<span style="color:#8b949e; font-size:10px;">USD/IDR</span> '
+            f'<span style="color:#ffa500; margin-left:4px;">{kurs_val:,.0f}</span> '
+            f'<span style="color:{kurs_color}; margin-left:4px;">{kurs_arrow} {abs(kurs_chg):.2f}%</span>'
+            f'</span>'
+            f'<span class="ticker-divider"></span>'
+        )
+
     for item in marquee_data:
         arrow = "+" if item["change"] > 0 else ("-" if item["change"] < 0 else "~")
         color_hex = (

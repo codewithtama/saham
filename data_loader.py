@@ -348,3 +348,35 @@ def ambil_data_marquee() -> list:
             _set_offline("marquee ticker")
             return data_cache
         return []
+
+
+@st.cache_data(ttl=300)
+def ambil_kurs_usd_idr() -> dict | None:
+    """Ambil kurs USD/IDR dari Yahoo Finance. Returns dict {kurs, change_pct} atau None."""
+    cache_file = "kurs_usdidr.json"
+    try:
+        df = yf.download("USDIDR=X", period="2d", interval="1d", auto_adjust=True, progress=False)
+        if df.empty:
+            raise ValueError("Data kurs kosong")
+
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
+        df = df.dropna(subset=["Close"])
+        if df.empty:
+            raise ValueError("Kolom Close kurs kosong")
+
+        kurs_kini = float(df["Close"].iloc[-1])
+        kurs_prev = float(df["Close"].iloc[-2]) if len(df) >= 2 else kurs_kini
+        change_pct = ((kurs_kini - kurs_prev) / kurs_prev) * 100 if kurs_prev > 0 else 0.0
+
+        result = {"kurs": kurs_kini, "change_pct": change_pct}
+        _simpan_cache_json(result, cache_file)
+        return result
+
+    except Exception:
+        data_cache, _ = _baca_cache_json(cache_file)
+        if data_cache:
+            _set_offline("kurs USD/IDR")
+            return data_cache
+        return None
