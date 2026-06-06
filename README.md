@@ -16,8 +16,6 @@ Dibuat sebagai alat bantu belajar dan analisa awal -- bukan rekomendasi investas
 - Sinyal teknikal dari RSI, MA Cross, MACD, dan Stochastic
 - Ringkasan konsensus sinyal dalam bahasa sederhana
 - Membandingkan sampai 5 saham sekaligus dengan grafik yang dinormalisasi ke 100%
-- Simulasi beli/jual berdasarkan data historis dengan laporan win rate, drawdown, dan Sharpe Ratio
-- Kalkulator risiko dan jumlah lot berdasarkan modal, harga beli, dan batas risiko
 - Ekspor data historis ke CSV
 - Running text harga saham di bagian atas halaman
 - Mode offline: jika tidak ada internet, data ditampilkan dari cache lokal terakhir
@@ -38,8 +36,6 @@ Yang ditampilkan:
 - Harga terakhir, tertinggi/terendah periode, volume, RSI
 - Sinyal teknikal dan gambaran konsensus
 - Grafik harga utama dengan alat bantu grafik pilihan
-- Simulasi beli/jual (backtest)
-- Kalkulator risiko dan lot
 - Data historis 30 baris terakhir dengan ekspor CSV
 
 ### Bandingkan Saham
@@ -66,8 +62,6 @@ Yang ditampilkan:
 | 1 Tahun        | Harian         |
 | 2 Tahun        | Harian         |
 | 5 Tahun        | Harian         |
-
-Untuk simulasi beli/jual (backtest), gunakan periode minimal 6 Bulan agar indikator punya cukup data untuk membentuk sinyal yang valid.
 
 ---
 
@@ -120,47 +114,6 @@ Gambaran ini hanya alat bantu membaca grafik -- bukan jaminan arah harga.
 
 ---
 
-## Simulasi Beli/Jual (Backtest)
-
-Fitur ini mensimulasikan aturan beli/jual aplikasi pada data historis. Modal awal mengikuti nilai yang diisi di kalkulator risiko.
-
-Cara kerja:
-1. Aplikasi membaca data dari awal periode hingga akhir
-2. Setiap hari, minimal 4 indikator dicek: RSI, MA position, MACD crossover, Stochastic
-3. Jika minimal 2 tanda mengarah beli dan tidak ada tanda jual, posisi dibuka
-4. Jika minimal 2 tanda mengarah jual dan tidak ada tanda beli, posisi ditutup
-5. Stop-loss otomatis aktif jika harga turun 7% dari harga beli
-
-Yang ditampilkan:
-- Total return simulasi vs benchmark beli-tahan
-- Jumlah transaksi dan win rate
-- Penurunan terbesar selama simulasi (max drawdown)
-- Sharpe Ratio (target > 1.0)
-- Log transaksi beli dan jual
-
-Biaya broker disertakan: 0.15% saat beli, 0.25% saat jual (standar BEI).
-
-Simulasi masa lalu tidak menjamin hasil masa depan. Fitur ini untuk belajar dan memahami risiko, bukan untuk digunakan sebagai sinyal trading langsung.
-
----
-
-## Kalkulator Risiko dan Lot
-
-Input:
-- Modal maksimal (Rp)
-- Harga beli per lembar (Rp)
-- Batas risiko (%)
-
-Output otomatis:
-- Jumlah lot maksimal yang bisa dibeli
-- Total dana yang digunakan
-- Harga stop-loss
-- Risiko dalam Rupiah
-
-Hasil berubah otomatis setiap kali input diubah, tanpa tombol kirim. Di mode Bandingkan Saham, pengguna bisa memilih saham mana yang dipakai untuk kalkulator ini.
-
----
-
 ## Mode Offline
 
 Jika tidak ada koneksi internet, aplikasi tidak crash. Sebaliknya, data ditampilkan dari cache lokal terakhir dengan banner pemberitahuan di bagian atas.
@@ -183,7 +136,7 @@ app.py              -- Tampilan utama Streamlit, sidebar, dan alur rendering
 data_loader.py      -- Pengambilan data dari yfinance dan manajemen cache lokal
 config_saham.json   -- Daftar saham, pilihan periode, terjemahan sektor, ringkasan perusahaan
 charts.py           -- Pembuatan grafik: candlestick, RSI, MACD, OBV, ATR, financial, dll
-indicators.py       -- Perhitungan indikator teknikal, sinyal konsensus, dan backtest engine
+indicators.py       -- Perhitungan indikator teknikal dan sinyal konsensus
 requirements.txt    -- Daftar dependency Python
 cache/              -- Folder cache lokal (otomatis dibuat, tidak masuk git)
 README.md           -- Dokumentasi ini

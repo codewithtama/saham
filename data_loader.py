@@ -432,31 +432,69 @@ def ambil_indeks_pasar() -> list[dict]:
 def ambil_berita(ticker: str) -> list[dict]:
     """
     Ambil berita terbaru untuk ticker dari Yahoo Finance.
-    Return list of dict: [{title, publisher, link, waktu_str}, ...]
-    Maks 8 berita. Fallback ke cache lokal.
+    Return list of dict: [{title, publisher, link, waktu_str, is_fallback, fallback_label}, ...]
+    Maks 8 berita. Fallback ke ticker tanpa .JK, lalu ke IHSG (^JKSE).
     """
     cache_file = f"news_{ticker.replace('.', '_')}.json"
     try:
+        # 1. Coba ambil berita ticker asli
         t = yf.Ticker(ticker)
         raw_news = t.news
+        is_fallback = False
+        fallback_label = ""
+        
+        # 2. Jika kosong, coba strip suffix .JK
+        if not raw_news and ".JK" in ticker:
+            clean_ticker = ticker.split(".")[0]
+            try:
+                t_clean = yf.Ticker(clean_ticker)
+                raw_news = t_clean.news
+                if raw_news:
+                    is_fallback = True
+                    fallback_label = f"Pencarian kata kunci: {clean_ticker}"
+            except Exception:
+                pass
+                
+        # 3. Jika masih kosong, ambil berita IHSG (^JKSE) sebagai konteks pasar
         if not raw_news:
-            raise ValueError("Tidak ada berita")
+            try:
+                t_market = yf.Ticker("^JKSE")
+                raw_news = t_market.news
+                if raw_news:
+                    is_fallback = True
+                    fallback_label = "Berita Pasar / IHSG"
+            except Exception:
+                pass
+
+        if not raw_news:
+            raise ValueError("Tidak ada berita di semua fallback")
 
         result = []
         for item in raw_news[:8]:
             ts = item.get("providerPublishTime", 0)
-            try:
-                from zoneinfo import ZoneInfo
-                waktu = datetime.fromtimestamp(ts, tz=ZoneInfo("Asia/Jakarta"))
-                waktu_str = waktu.strftime("%d %b %Y %H:%M WIB")
-            except Exception:
-                waktu_str = "-"
+            
+            # Format waktu yang aman & tangguh
+            waktu_str = "-"
+            if ts > 0:
+                try:
+                    from zoneinfo import ZoneInfo
+                    waktu = datetime.fromtimestamp(ts, tz=ZoneInfo("Asia/Jakarta"))
+                    waktu_str = waktu.strftime("%d %b %Y %H:%M WIB")
+                except Exception:
+                    try:
+                        # Fallback ke timezone local time bawaan sistem
+                        waktu = datetime.fromtimestamp(ts)
+                        waktu_str = waktu.strftime("%d %b %Y %H:%M") + " WIB (Lokal)"
+                    except Exception:
+                        waktu_str = "-"
 
             result.append({
                 "title": item.get("title", "Tanpa Judul"),
                 "publisher": item.get("publisher", "Unknown"),
                 "link": item.get("link", "#"),
                 "waktu_str": waktu_str,
+                "is_fallback": is_fallback,
+                "fallback_label": fallback_label,
             })
 
         _simpan_cache_json(result, cache_file)
@@ -467,3 +505,4 @@ def ambil_berita(ticker: str) -> list[dict]:
         if data_cache:
             return data_cache
         return []
+

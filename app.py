@@ -145,23 +145,14 @@ st.markdown(
         font-family: 'JetBrains Mono', 'Consolas', monospace !important;
         font-weight: bold;
         white-space: nowrap;
-        margin-right: 52px;
-    }
-    .ticker-kurs {
-        font-size: 12px;
-        font-family: 'JetBrains Mono', 'Consolas', monospace !important;
-        font-weight: bold;
-        white-space: nowrap;
-        margin-right: 52px;
-        padding: 2px 10px;
-        border-left: 2px solid #ffa500;
-        border-right: 2px solid #333;
+        display: inline-block;
+        vertical-align: middle;
     }
     .ticker-divider {
         width: 1px;
-        height: 18px;
+        height: 14px;
         background: #333;
-        margin-right: 52px;
+        margin: 0 26px;
         display: inline-block;
         vertical-align: middle;
     }
@@ -261,6 +252,18 @@ st.markdown(
     }
 
     hr { border-color: #222222; }
+
+    /* Style link berita */
+    .news-card-link {
+        color: #ffa500 !important;
+        text-decoration: none !important;
+        transition: color 0.15s ease-in-out;
+    }
+    .news-card-link:hover {
+        color: #ffb732 !important;
+        text-decoration: underline !important;
+    }
+
 
     /* ==========================================================
        PROTEKSI FONT DAN IKON SISTEM
@@ -483,6 +486,11 @@ def tampilkan_berita(ticker: str):
     with st.spinner("Mengambil berita..."):
         news_items = ambil_berita(ticker)
     if news_items:
+        # Tampilkan info jika ini fallback berita pasar
+        first_item = news_items[0]
+        if first_item.get("is_fallback"):
+            st.caption(f"ℹ️ Menampilkan berita dari: **{first_item.get('fallback_label', 'Konteks Pasar')}** (karena berita spesifik emiten ini tidak ditemukan)")
+            
         for item in news_items:
             st.markdown(
                 f"""
@@ -494,7 +502,7 @@ def tampilkan_berita(ticker: str):
                     margin-bottom: 8px;
                 ">
                     <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">
-                        <a href="{item['link']}" target="_blank" style="color: #ffa500; text-decoration: none;">
+                        <a href="{item['link']}" target="_blank" class="news-card-link">
                             {item['title']}
                         </a>
                     </div>
@@ -508,6 +516,7 @@ def tampilkan_berita(ticker: str):
             )
     else:
         st.info("Tidak ada berita terbaru yang tersedia untuk emiten ini dari Yahoo Finance.")
+
 
 
 
@@ -861,8 +870,8 @@ if marquee_data:
         # Rupiah melemah = dolar naik = merah untuk investor saham
         kurs_color = "#ff3333" if kurs_chg > 0 else ("#00ff00" if kurs_chg < 0 else "#8b949e")
         ticker_html_items.append(
-            f'<span class="ticker-kurs">'
-            f'<span style="color:#8b949e; font-size:10px;">USD/IDR</span> '
+            f'<span class="ticker-item">'
+            f'<span style="color:#ffffff;">USD/IDR</span> '
             f'<span style="color:#ffa500; margin-left:4px;">{kurs_val:,.0f}</span> '
             f'<span style="color:{kurs_color}; margin-left:4px;">{kurs_arrow} {abs(kurs_chg):.2f}%</span>'
             f'</span>'
@@ -875,9 +884,9 @@ if marquee_data:
         idx_arrow = "+" if idx_chg > 0 else ("-" if idx_chg < 0 else "~")
         idx_color = "#00ff00" if idx_chg > 0 else ("#ff3333" if idx_chg < 0 else "#8b949e")
         ticker_html_items.append(
-            f'<span class="ticker-kurs">'
-            f'<span style="color:#8b949e; font-size:10px;">{idx_item["kode"]}</span> '
-            f'<span style="color:#ffa500; margin-left:4px;">{idx_item["harga"]:,.2f}</span> '
+            f'<span class="ticker-item">'
+            f'<span style="color:#ffffff;">{idx_item["kode"]}</span> '
+            f'<span style="color:#ffa500; margin-left:4px;">{idx_item["harga"]:,.0f}</span> '
             f'<span style="color:{idx_color}; margin-left:4px;">{idx_arrow} {abs(idx_chg):.2f}%</span>'
             f'</span>'
             f'<span class="ticker-divider"></span>'
@@ -894,9 +903,10 @@ if marquee_data:
         ticker_html_items.append(
             f'<span class="ticker-item">'
             f'<span style="color:#ffffff;">{item["kode"]}</span> '
-            f'<span style="color:#ffa500; margin-left: 4px;">{item["harga"]:,.0f}</span> '
-            f'<span style="color:{color_hex}; margin-left: 4px;">{arrow} {item["change"]:+.2f}%</span>'
-            f"</span>"
+            f'<span style="color:#ffa500; margin-left:4px;">{item["harga"]:,.0f}</span> '
+            f'<span style="color:{color_hex}; margin-left:4px;">{arrow} {abs(item["change"]):.2f}%</span>'
+            f'</span>'
+            f'<span class="ticker-divider"></span>'
         )
 
     ticker_string = "".join(ticker_html_items)
