@@ -77,12 +77,13 @@ def _fetch_ticker(ticker: str, periode: str) -> tuple[str, object, dict]:
 @st.cache_data(ttl=3600)
 def _ambil_sektor_list() -> list[str]:
     """Bangun daftar sektor unik dari semua ticker SAHAM_IDX. Di-cache 1 jam."""
-    sektors: set[str] = set()
-    for ticker in SAHAM_IDX.values():
-        fund = ambil_fundamental(ticker)
-        if fund and fund.get("sektor"):
-            sektors.add(fund["sektor"])
-    return ["Semua"] + sorted(sektors)
+    from features import ambil_semua_fundamental_raw
+    df = ambil_semua_fundamental_raw()
+    if not df.empty and "Sektor" in df.columns:
+        sektors = df["Sektor"].dropna().unique()
+        return ["Semua"] + sorted([s for s in sektors if s and s != "N/A"])
+    return ["Semua"]
+
 
 
 # ========================================
@@ -527,56 +528,44 @@ def tampilkan_peer_group_analysis(ticker, fundamental):
         
     st.markdown(f"### Perbandingan Sektoral ({sektor})")
     
-    peers = []
-    for nama_saham, tick in SAHAM_IDX.items():
-        if tick == ticker:
-            continue
-        fund = ambil_fundamental(tick)
-        if fund and fund.get("sektor") == sektor:
-            peers.append((tick, fund))
-            if len(peers) >= 4:
-                break
-                
-    all_peers = [(ticker, fundamental)] + peers
+    from features import ambil_semua_fundamental_raw
+    df_all = ambil_semua_fundamental_raw()
+    if df_all.empty:
+        st.info("Data perbandingan sektoral tidak tersedia.")
+        return
+        
+    # Ambil baris dengan sektor yang sama
+    df_sec = df_all[df_all["Sektor"] == sektor].copy()
+    
+    clean_ticker = ticker.replace(".JK", "")
+    df_main = df_sec[df_sec["Kode"] == clean_ticker].copy()
+    df_others = df_sec[df_sec["Kode"] != clean_ticker].copy()
+    
+    # Batasi peer maksimal 4, urutkan berdasarkan Market Cap terbesar
+    df_others = df_others.sort_values("_market_cap", ascending=False).head(4)
+    
+    df_final = pd.concat([df_main, df_others]).reset_index(drop=True)
     
     rows = []
-    for tick, f in all_peers:
-        mc_val = f.get("market_cap")
-        mc_str = f"Rp {mc_val / 1e12:.2f} T" if mc_val and mc_val >= 1e12 else (f"Rp {mc_val / 1e9:.2f} M" if mc_val and mc_val >= 1e9 else "N/A")
-        
-        pe_val = f.get("pe_ratio")
-        pe_str = f"{pe_val:.2f}x" if pe_val else "N/A"
-        
-        pbv_val = f.get("pbv")
-        pbv_str = f"{pbv_val:.2f}x" if pbv_val is not None else "N/A"
-        
-        roe_val = f.get("roe")
-        roe_str = f"{roe_val * 100:.2f}%" if roe_val is not None else "N/A"
-        
-        der_val = f.get("der")
-        der_str = f"{der_val:.2f}%" if der_val is not None else "N/A"
-        
-        div_val = f.get("dividend_yield")
-        div_persen = div_val if div_val and div_val > 1.0 else (div_val * 100 if div_val else 0)
-        div_str = f"{div_persen:.2f}%" if div_val else "N/A"
-        
-        display_ticker = tick.split(".JK")[0]
-        if tick == ticker:
+    for _, row in df_final.iterrows():
+        display_ticker = row["Kode"]
+        if display_ticker == clean_ticker:
             display_ticker = f"{display_ticker} (Aktif)"
             
         rows.append({
             "Kode": display_ticker,
-            "Perusahaan": f.get("nama", tick.split(".JK")[0]),
-            "Market Cap": mc_str,
-            "P/E Ratio": pe_str,
-            "PBV Ratio": pbv_str,
-            "ROE": roe_str,
-            "DER": der_str,
-            "Div Yield": div_str
+            "Perusahaan": row["Nama"],
+            "Market Cap": row["Market Cap"],
+            "P/E Ratio": f"{row['P/E']:.2f}x" if row["P/E"] > 0 else "N/A",
+            "PBV Ratio": f"{row['PBV']:.2f}x" if row["PBV"] > 0 else "N/A",
+            "ROE": f"{row['ROE (%)']:.2f}%" if row["ROE (%)"] > 0 else "N/A",
+            "DER": f"{row['DER (%)']:.2f}%" if row["DER (%)"] > 0 else "N/A",
+            "Div Yield": f"{row['Div Yield (%)']:.2f}%" if row["Div Yield (%)"] > 0 else "N/A"
         })
         
     df_peers = pd.DataFrame(rows)
     st.dataframe(df_peers.set_index("Kode"), use_container_width=True)
+
 
 
 def tampilkan_metrik_dan_sinyal(df, ticker, timeframe):
@@ -1308,10 +1297,26 @@ with tab_watchlist:
     else:
         wl_rows = []
         with st.spinner("Memuat harga terkini watchlist..."):
+            # Fetch data secara paralel untuk mempercepat pemuatan watchlist
+            def _fetch_wl_item(t):
+                df_wl = ambil_data(t, "1mo")
+                fund_wl = ambil_fundamental(t)
+                return t, df_wl, fund_wl
+            
+            wl_results = {}
+            with ThreadPoolExecutor(max_workers=min(8, len(wl))) as executor:
+                future_wl = {executor.submit(_fetch_wl_item, t): t for t in wl}
+                for future in as_completed(future_wl):
+                    t = future_wl[future]
+                    try:
+                        _, df_wl, fund_wl = future.result()
+                        wl_results[t] = (df_wl, fund_wl)
+                    except Exception:
+                        wl_results[t] = (None, None)
+
             for _tick_wl in wl:
                 _kode_wl = _tick_wl.replace(".JK", "")
-                _df_wl = ambil_data(_tick_wl, "1mo")  # daily data, reliable diluar jam bursa
-                _fund_wl = ambil_fundamental(_tick_wl)
+                _df_wl, _fund_wl = wl_results.get(_tick_wl, (None, None))
                 _harga = f"Rp {float(_df_wl['Close'].iloc[-1]):,.0f}" if _df_wl is not None and not _df_wl.empty else "N/A"
                 _chg = "N/A"
                 if _df_wl is not None and len(_df_wl) >= 2:
@@ -1325,6 +1330,7 @@ with tab_watchlist:
                     "Harga Terakhir": _harga,
                     "Perubahan": _chg,
                 })
+
 
         df_wl_tbl = pd.DataFrame(wl_rows)
         st.dataframe(df_wl_tbl, use_container_width=True, hide_index=True)

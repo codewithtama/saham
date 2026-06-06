@@ -121,6 +121,31 @@ def _fetch_fundamental_for_screener(ticker: str, nama: str) -> dict | None:
     }
 
 
+@st.cache_data(ttl=3600)
+def ambil_semua_fundamental_raw() -> pd.DataFrame:
+    """
+    Mengambil data fundamental untuk seluruh ticker SAHAM_IDX secara paralel
+    dan mengembalikannya sebagai DataFrame mentah. Di-cache selama 1 jam.
+    """
+    from data_loader import SAHAM_IDX
+    results: list[dict] = []
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {
+            ex.submit(_fetch_fundamental_for_screener, ticker, name): ticker
+            for name, ticker in SAHAM_IDX.items()
+        }
+        for future in as_completed(futures):
+            try:
+                row = future.result()
+                if row:
+                    results.append(row)
+            except Exception:
+                continue
+    if not results:
+        return pd.DataFrame()
+    return pd.DataFrame(results)
+
+
 def jalankan_screener(
     sektor_filter: str | None,
     pe_max: float,
@@ -130,29 +155,14 @@ def jalankan_screener(
     mc_min_t: float,  # dalam Triliun Rp
 ) -> pd.DataFrame:
     """
-    Fetch fundamental semua ticker SAHAM_IDX secara concurrent,
-    lalu filter sesuai parameter. Mengembalikan DataFrame hasil.
+    Filter data fundamental yang sudah di-cache berdasarkan parameter input.
+    Sangat cepat karena tidak ada I/O network.
     """
-    from data_loader import SAHAM_IDX
-
-    results: list[dict] = []
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        futures = {
-            ex.submit(_fetch_fundamental_for_screener, ticker, nama): ticker
-            for nama, ticker in SAHAM_IDX.items()
-        }
-        for future in as_completed(futures):
-            try:
-                row = future.result()
-                if row:
-                    results.append(row)
-            except Exception:
-                continue
-
-    if not results:
+    df = ambil_semua_fundamental_raw()
+    if df.empty:
         return pd.DataFrame()
 
-    df = pd.DataFrame(results)
+    df = df.copy()
 
     # Terapkan filter
     if sektor_filter and sektor_filter != "Semua":
