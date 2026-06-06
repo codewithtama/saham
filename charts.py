@@ -54,6 +54,7 @@ def buat_candlestick(
     show_bb: bool,
     tipe_grafik: str = "candle",
     show_regression: bool = False,
+    sr_levels: list[dict] | None = None,
 ) -> plt.Figure:
     # Warna utama grafik: hijau untuk naik, merah untuk turun
     mc = mpf.make_marketcolors(
@@ -303,6 +304,27 @@ def buat_candlestick(
         pad=8,
         fontweight="bold",
     )
+
+    # Gambar garis Support & Resistance jika ada
+    if sr_levels and tipe_grafik not in ["renko", "pnf"]:
+        for level in sr_levels:
+            harga = level["harga"]
+            label = level["label"]
+            jenis = level["jenis"]
+            color = "#ff3333" if jenis == "R" else "#00e676"
+            axes[0].axhline(
+                harga, color=color, linewidth=0.9,
+                linestyle="--", alpha=0.75
+            )
+            # Label kecil di sisi kanan
+            axes[0].text(
+                df.index[-1], harga,
+                f" {label} {harga:,.0f}",
+                color=color, fontsize=7.5,
+                va="bottom", ha="right",
+                fontweight="bold",
+            )
+
     return fig
 
 

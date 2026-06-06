@@ -39,3 +39,6 @@ Thumbs.db
 cache/*.csv
 cache/*.json
 cache/*.meta
+
+# Data personal pengguna (watchlist, portfolio)
+data/*.json

@@ -16,10 +16,12 @@ warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
 import importlib
 import charts
 import data_loader
+import features
 import indicators
 
 importlib.reload(charts)
 importlib.reload(data_loader)
+importlib.reload(features)
 importlib.reload(indicators)
 
 from charts import (
@@ -42,6 +44,16 @@ from data_loader import (
     ambil_financial_history,
     ambil_dividend_history,
     ambil_kurs_usd_idr,
+)
+from features import (
+    baca_portfolio,
+    baca_watchlist,
+    hapus_dari_watchlist,
+    hitung_portfolio_summary,
+    hitung_support_resistance,
+    jalankan_screener,
+    simpan_portfolio,
+    tambah_ke_watchlist,
 )
 from indicators import (
     hitung_konsensus_sinyal,
@@ -720,6 +732,11 @@ with st.sidebar:
         value=False,
         help="Menunjukkan seberapa lebar gerak harga belakangan ini.",
     )
+    show_sr = st.checkbox(
+        "Support & Resistance",
+        value=False,
+        help="Garis support (harga bawah kuat) dan resistance (harga atas kuat) yang dihitung otomatis dari swing high/low data historis.",
+    )
 
     st.divider()
     st.caption("Data: Yahoo Finance (yfinance)")
@@ -871,10 +888,15 @@ if st.session_state.get("offline_mode"):
 
 
 # ========================================
-# RENDERING HALAMAN UTAMA
+# NAVIGASI TAB UTAMA
 # ========================================
+tab_analisa, tab_screener, tab_watchlist, tab_portfolio = st.tabs(
+    ["Analisa Saham", "Stock Screener", "Watchlist", "Portfolio"]
+)
 
-if mode == "Bandingkan Saham (Maks 5)" and len(valid_tickers) > 1:
+with tab_analisa:
+
+    if mode == "Bandingkan Saham (Maks 5)" and len(valid_tickers) > 1:
     # ----------------------------------------
     # MODE BANDINGKAN MULTI SAHAM (Sistem Simetris Dinamis)
     # ----------------------------------------
