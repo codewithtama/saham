@@ -895,206 +895,422 @@ tab_analisa, tab_screener, tab_watchlist, tab_portfolio = st.tabs(
 )
 
 with tab_analisa:
-
     if mode == "Bandingkan Saham (Maks 5)" and len(valid_tickers) > 1:
-    # ----------------------------------------
-    # MODE BANDINGKAN MULTI SAHAM (Sistem Simetris Dinamis)
-    # ----------------------------------------
-    st.subheader("Bandingkan Pergerakan Saham")
+        # ----------------------------------------
+        # MODE BANDINGKAN MULTI SAHAM (Sistem Simetris Dinamis)
+        # ----------------------------------------
+        st.subheader("Bandingkan Pergerakan Saham")
 
-    # 1. Grafik perbandingan perubahan harga
-    fig_cmp = buat_compare_chart(valid_tickers, dfs)
-    st.pyplot(fig_cmp, use_container_width=True)
-    plt.close(fig_cmp)
+        # 1. Grafik perbandingan perubahan harga
+        fig_cmp = buat_compare_chart(valid_tickers, dfs)
+        st.pyplot(fig_cmp, use_container_width=True)
+        plt.close(fig_cmp)
 
-    # 2. Tabel ringkasan perbandingan
-    st.subheader("Ringkasan Perbandingan")
+        # 2. Tabel ringkasan perbandingan
+        st.subheader("Ringkasan Perbandingan")
 
-    def ringkasan(d, ticker, f_data):
-        ret = d["Close"].pct_change().dropna()
+        def ringkasan(d, ticker, f_data):
+            ret = d["Close"].pct_change().dropna()
 
-        mc_v = f_data.get("market_cap")
-        if mc_v:
-            mc_s = (
-                f"Rp {mc_v / 1e12:.2f}T"
-                if mc_v >= 1e12
-                else (f"Rp {mc_v / 1e9:.2f}M" if mc_v >= 1e9 else f"Rp {mc_v:,.0f}")
-            )
+            mc_v = f_data.get("market_cap")
+            if mc_v:
+                mc_s = (
+                    f"Rp {mc_v / 1e12:.2f}T"
+                    if mc_v >= 1e12
+                    else (f"Rp {mc_v / 1e9:.2f}M" if mc_v >= 1e9 else f"Rp {mc_v:,.0f}")
+                )
+            else:
+                mc_s = "Tidak tersedia"
+
+            pe_v = f_data.get("pe_ratio")
+            pe_s = f"{pe_v:.2f}x" if pe_v else "Tidak tersedia"
+
+            rsi_val = float(hitung_rsi(d["Close"]).iloc[-1]) if len(d) > 0 else np.nan
+
+            return {
+                "Ticker": ticker,
+                "Nama Perusahaan": f_data.get("nama", ticker.split(".")[0]),
+                "Sektor": f_data.get("sektor", "N/A"),
+                "Nilai Perusahaan di Bursa": mc_s,
+                "P/E (Harga vs Laba)": pe_s,
+                "Harga Terakhir (Rp)": f"{float(d['Close'].iloc[-1]):,.0f}",
+                "Perubahan Periode Ini": f"{((float(d['Close'].iloc[-1]) / float(d['Close'].iloc[0])) - 1) * 100:+.2f}%",
+                "Naik-Turun Harian": f"{float(ret.std()) * 100:.2f}%",
+                "Naik-Turun Tahunan": f"{float(ret.std()) * np.sqrt(252) * 100:.2f}%",
+                "Skor Risiko/Untung": f"{(float(ret.mean()) / float(ret.std())):.3f}"
+                if float(ret.std()) > 0
+                else "N/A",
+                "RSI Terkini": f"{rsi_val:.1f}" if not pd.isna(rsi_val) else "N/A",
+            }
+
+        stats_rows = []
+        for t, d, f in zip(valid_tickers, dfs, fundamentals):
+            stats_rows.append(ringkasan(d, t, f))
+        df_tbl = pd.DataFrame(stats_rows).set_index("Ticker").T
+        st.dataframe(df_tbl, use_container_width=True)
+
+        st.divider()
+
+        # 3. Grafik utama per saham
+        st.subheader("Grafik Harga Utama")
+        tab_charts = st.tabs([f"Grafik {t}" for t in valid_tickers])
+        for tab_c, t, d in zip(tab_charts, valid_tickers, dfs):
+            with tab_c:
+                sr = hitung_support_resistance(d) if show_sr else None
+                fig_t = buat_candlestick(
+                    d, t, show_ma20, show_ma50, show_bb, tipe_grafik, show_regression, sr
+                )
+                st.pyplot(fig_t, use_container_width=True)
+                plt.close(fig_t)
+
+        st.divider()
+
+        # 4. Detail tiap saham
+        st.subheader("Detail Masing-masing Saham")
+        tab_details = st.tabs([f"Detail {t}" for t in valid_tickers])
+        for tab_d, t, d, f in zip(tab_details, valid_tickers, dfs, fundamentals):
+            with tab_d:
+                tampilkan_profil_perusahaan(f, t)
+                st.divider()
+                tampilkan_metrik_dan_sinyal(d, t, timeframe)
+                st.divider()
+                tampilkan_analisis_fundamental_tambahan(t, f)
+                st.divider()
+                tampilkan_peer_group_analysis(t, f)
+                st.divider()
+
+                if show_rsi:
+                    st.subheader("RSI -- Apakah Saham Mulai Terlalu Mahal/Murah?")
+                    fig_rsi = buat_rsi_chart(d)
+                    st.pyplot(fig_rsi, use_container_width=True)
+                    plt.close(fig_rsi)
+                    st.divider()
+
+                if show_macd:
+                    st.subheader("MACD")
+                    fig_macd = buat_macd_chart(d)
+                    st.pyplot(fig_macd, use_container_width=True)
+                    plt.close(fig_macd)
+                    st.divider()
+
+                if show_vol:
+                    st.subheader("Naik-Turun Harga Harian")
+                    fig_v = buat_volatilitas_chart(d, t)
+                    st.pyplot(fig_v, use_container_width=True)
+                    plt.close(fig_v)
+                    st.divider()
+
+                if show_stoch:
+                    st.subheader("Stochastic -- Tanda Harga Mulai Berbalik")
+                    fig_stoch = buat_stochastic_chart(d)
+                    st.pyplot(fig_stoch, use_container_width=True)
+                    plt.close(fig_stoch)
+                    st.divider()
+
+                if show_obv:
+                    st.subheader("OBV -- Dukungan dari Volume")
+                    fig_obv = buat_obv_chart(d)
+                    st.pyplot(fig_obv, use_container_width=True)
+                    plt.close(fig_obv)
+                    st.divider()
+
+                if show_atr:
+                    st.subheader("ATR -- Lebar Gerak Harga")
+                    fig_atr = buat_atr_chart(d)
+                    st.pyplot(fig_atr, use_container_width=True)
+                    plt.close(fig_atr)
+                    st.divider()
+
+                tampilkan_data_historis(d, t)
+
+    else:
+        # ----------------------------------------
+        # MODE SINGLE SAHAM
+        # ----------------------------------------
+        t_utama = valid_tickers[0]
+        df_utama = dfs[0]
+        fund_utama = fundamentals[0]
+
+        tampilkan_profil_perusahaan(fund_utama, t_utama)
+        st.divider()
+        tampilkan_analisis_fundamental_tambahan(t_utama, fund_utama)
+        st.divider()
+        tampilkan_peer_group_analysis(t_utama, fund_utama)
+        st.divider()
+        tampilkan_metrik_dan_sinyal(df_utama, t_utama, timeframe)
+        st.divider()
+
+        # Tombol Watchlist
+        wl_kini = baca_watchlist()
+        if t_utama in wl_kini:
+            if st.button(f"Hapus {t_utama.replace('.JK','')} dari Watchlist", key="btn_wl_hapus"):
+                hapus_dari_watchlist(t_utama)
+                st.success(f"{t_utama.replace('.JK','')} dihapus dari Watchlist.")
+                st.rerun()
         else:
-            mc_s = "Tidak tersedia"
+            if st.button(f"Tambah {t_utama.replace('.JK','')} ke Watchlist", key="btn_wl_tambah"):
+                tambah_ke_watchlist(t_utama)
+                st.success(f"{t_utama.replace('.JK','')} ditambahkan ke Watchlist.")
+                st.rerun()
 
-        pe_v = f_data.get("pe_ratio")
-        pe_s = f"{pe_v:.2f}x" if pe_v else "Tidak tersedia"
+        st.divider()
+        st.subheader("Grafik Utama")
+        sr_utama = hitung_support_resistance(df_utama) if show_sr else None
+        fig_candle = buat_candlestick(
+            df_utama, t_utama, show_ma20, show_ma50, show_bb, tipe_grafik, show_regression, sr_utama
+        )
+        st.pyplot(fig_candle, use_container_width=True)
+        plt.close(fig_candle)
 
-        rsi_val = float(hitung_rsi(d["Close"]).iloc[-1]) if len(d) > 0 else np.nan
+        if show_rsi:
+            st.subheader("RSI -- Apakah Saham Mulai Terlalu Mahal/Murah?")
+            fig_rsi = buat_rsi_chart(df_utama)
+            st.pyplot(fig_rsi, use_container_width=True)
+            plt.close(fig_rsi)
 
-        return {
-            "Ticker": ticker,
-            "Nama Perusahaan": f_data.get("nama", ticker.split(".")[0]),
-            "Sektor": f_data.get("sektor", "N/A"),
-            "Nilai Perusahaan di Bursa": mc_s,
-            "P/E (Harga vs Laba)": pe_s,
-            "Harga Terakhir (Rp)": f"{float(d['Close'].iloc[-1]):,.0f}",
-            "Perubahan Periode Ini": f"{((float(d['Close'].iloc[-1]) / float(d['Close'].iloc[0])) - 1) * 100:+.2f}%",
-            "Naik-Turun Harian": f"{float(ret.std()) * 100:.2f}%",
-            "Naik-Turun Tahunan": f"{float(ret.std()) * np.sqrt(252) * 100:.2f}%",
-            "Skor Risiko/Untung": f"{(float(ret.mean()) / float(ret.std())):.3f}"
-            if float(ret.std()) > 0
-            else "N/A",
-            "RSI Terkini": f"{rsi_val:.1f}" if not pd.isna(rsi_val) else "N/A",
-        }
+        if show_macd:
+            st.subheader("MACD")
+            fig_macd = buat_macd_chart(df_utama)
+            st.pyplot(fig_macd, use_container_width=True)
+            plt.close(fig_macd)
 
-    stats_rows = []
-    for t, d, f in zip(valid_tickers, dfs, fundamentals):
-        stats_rows.append(ringkasan(d, t, f))
-    df_tbl = pd.DataFrame(stats_rows).set_index("Ticker").T
-    st.dataframe(df_tbl, use_container_width=True)
+        if show_vol:
+            st.subheader("Naik-Turun Harga Harian")
+            fig_v = buat_volatilitas_chart(df_utama, t_utama)
+            st.pyplot(fig_v, use_container_width=True)
+            plt.close(fig_v)
 
-    st.divider()
+        if show_stoch:
+            st.subheader("Stochastic -- Tanda Harga Mulai Berbalik")
+            fig_stoch = buat_stochastic_chart(df_utama)
+            st.pyplot(fig_stoch, use_container_width=True)
+            plt.close(fig_stoch)
 
-    # 3. Grafik utama per saham
-    st.subheader("Grafik Harga Utama")
-    tab_charts = st.tabs([f"Grafik {t}" for t in valid_tickers])
-    for tab_c, t, d in zip(tab_charts, valid_tickers, dfs):
-        with tab_c:
-            fig_t = buat_candlestick(
-                d, t, show_ma20, show_ma50, show_bb, tipe_grafik, show_regression
+        if show_obv:
+            st.subheader("OBV -- Dukungan dari Volume")
+            fig_obv = buat_obv_chart(df_utama)
+            st.pyplot(fig_obv, use_container_width=True)
+            plt.close(fig_obv)
+
+        if show_atr:
+            st.subheader("ATR -- Lebar Gerak Harga")
+            fig_atr = buat_atr_chart(df_utama)
+            st.pyplot(fig_atr, use_container_width=True)
+            plt.close(fig_atr)
+
+        tampilkan_data_historis(df_utama, t_utama)
+
+
+# ========================================
+# TAB STOCK SCREENER
+# ========================================
+with tab_screener:
+    st.subheader("Stock Screener")
+    st.caption("Filter saham dari daftar SAHAM_IDX berdasarkan kriteria fundamental.")
+
+    # Kumpulkan daftar sektor unik dari cache fundamental yang ada
+    semua_sektor: set[str] = set()
+    for _nama_scr, _tick_scr in SAHAM_IDX.items():
+        _f_scr = ambil_fundamental(_tick_scr)
+        if _f_scr and _f_scr.get("sektor"):
+            semua_sektor.add(_f_scr["sektor"])
+    opsi_sektor = ["Semua"] + sorted(semua_sektor)
+
+    col_f1, col_f2, col_f3 = st.columns(3)
+    with col_f1:
+        sektor_filter = st.selectbox("Sektor", opsi_sektor, key="scr_sektor")
+        pe_max = st.number_input(
+            "P/E Maks (0 = abaikan)", min_value=0.0, value=0.0, step=5.0, key="scr_pe",
+            help="Contoh: 20 untuk menyaring saham dengan P/E di bawah 20x. Isi 0 untuk menonaktifkan."
+        )
+    with col_f2:
+        roe_min = st.number_input(
+            "ROE Min (%)", min_value=0.0, value=0.0, step=1.0, key="scr_roe",
+            help="Contoh: 15 untuk hanya menampilkan saham dengan ROE minimal 15%."
+        )
+        der_max = st.number_input(
+            "DER Maks (%)", min_value=0.0, value=999.0, step=10.0, key="scr_der",
+            help="Contoh: 100 untuk menyaring saham dengan rasio utang tidak lebih dari 100% modal."
+        )
+    with col_f3:
+        div_min = st.number_input(
+            "Div Yield Min (%)", min_value=0.0, value=0.0, step=0.5, key="scr_div",
+            help="Contoh: 2.0 untuk hanya menampilkan saham dengan dividend yield minimal 2%."
+        )
+        mc_min_t = st.number_input(
+            "Market Cap Min (Triliun Rp)", min_value=0.0, value=0.0, step=5.0, key="scr_mc",
+            help="Contoh: 10 untuk hanya menampilkan saham dengan nilai perusahaan minimal Rp 10 Triliun."
+        )
+
+    if st.button("Cari Saham", key="btn_screener", type="primary"):
+        with st.spinner("Mengambil data fundamental semua saham..."):
+            df_hasil = jalankan_screener(
+                sektor_filter=sektor_filter,
+                pe_max=pe_max,
+                roe_min=roe_min,
+                der_max=der_max,
+                div_min=div_min,
+                mc_min_t=mc_min_t,
             )
-            st.pyplot(fig_t, use_container_width=True)
-            plt.close(fig_t)
 
-    st.divider()
+        if df_hasil.empty:
+            st.warning("Tidak ada saham yang memenuhi kriteria filter tersebut.")
+        else:
+            st.success(f"{len(df_hasil)} saham ditemukan.")
+            st.dataframe(df_hasil, use_container_width=True, hide_index=True)
 
-    # 4. Detail tiap saham
-    st.subheader("Detail Masing-masing Saham")
-    tab_details = st.tabs([f"Detail {t}" for t in valid_tickers])
-    for tab_d, t, d, f in zip(tab_details, valid_tickers, dfs, fundamentals):
-        with tab_d:
-            # Profil & Statistik
-            tampilkan_profil_perusahaan(f, t)
+
+# ========================================
+# TAB WATCHLIST
+# ========================================
+with tab_watchlist:
+    st.subheader("Watchlist")
+    st.caption("Daftar saham yang kamu simpan. Tambahkan dari tab Analisa Saham (mode Single).")
+
+    wl = baca_watchlist()
+
+    if not wl:
+        st.info("Watchlist masih kosong. Buka tab Analisa Saham, pilih saham, lalu klik 'Tambah ke Watchlist'.")
+    else:
+        wl_rows = []
+        with st.spinner("Memuat harga terkini watchlist..."):
+            for _tick_wl in wl:
+                _kode_wl = _tick_wl.replace(".JK", "")
+                _df_wl = ambil_data(_tick_wl, "5d")
+                _fund_wl = ambil_fundamental(_tick_wl)
+                _harga = f"Rp {float(_df_wl['Close'].iloc[-1]):,.0f}" if _df_wl is not None and not _df_wl.empty else "N/A"
+                _chg = "N/A"
+                if _df_wl is not None and len(_df_wl) >= 2:
+                    _h_kini = float(_df_wl["Close"].iloc[-1])
+                    _h_prev = float(_df_wl["Close"].iloc[-2])
+                    _chg = f"{((_h_kini - _h_prev) / _h_prev * 100):+.2f}%"
+                wl_rows.append({
+                    "Kode": _kode_wl,
+                    "Nama": _fund_wl.get("nama", _kode_wl) if _fund_wl else _kode_wl,
+                    "Sektor": _fund_wl.get("sektor", "N/A") if _fund_wl else "N/A",
+                    "Harga Terakhir": _harga,
+                    "Perubahan": _chg,
+                })
+
+        df_wl_tbl = pd.DataFrame(wl_rows)
+        st.dataframe(df_wl_tbl, use_container_width=True, hide_index=True)
+
+        st.markdown("**Hapus dari Watchlist:**")
+        kode_hapus = st.selectbox(
+            "Pilih saham yang ingin dihapus",
+            [t.replace(".JK", "") for t in wl],
+            key="wl_hapus_select"
+        )
+        if st.button("Hapus", key="btn_wl_hapus_tab"):
+            hapus_dari_watchlist(kode_hapus + ".JK")
+            st.success(f"{kode_hapus} dihapus dari watchlist.")
+            st.rerun()
+
+
+# ========================================
+# TAB PORTFOLIO TRACKER
+# ========================================
+with tab_portfolio:
+    st.subheader("Portfolio Tracker")
+    st.caption("Catat posisi saham kamu dan lihat unrealized P/L secara otomatis.")
+
+    portfolio = baca_portfolio()
+
+    # -- Form tambah posisi baru --
+    with st.expander("Tambah Posisi Baru", expanded=not bool(portfolio)):
+        opsi_saham_pf = list(SAHAM_IDX.keys()) + ["Input Ticker Manual"]
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            pilihan_pf = st.selectbox("Saham", opsi_saham_pf, key="pf_saham")
+            if pilihan_pf == "Input Ticker Manual":
+                raw_pf = st.text_input("Ticker (contoh: BBCA)", key="pf_manual").upper().strip()
+                ticker_pf = raw_pf if raw_pf.endswith(".JK") else raw_pf + ".JK"
+            else:
+                ticker_pf = SAHAM_IDX[pilihan_pf]
+            lot_pf = st.number_input(
+                "Jumlah Lot", min_value=1, value=1, step=1, key="pf_lot",
+                help="1 lot = 100 lembar saham di BEI."
+            )
+        with col_p2:
+            harga_beli_pf = st.number_input(
+                "Harga Beli per Lembar (Rp)", min_value=1, value=1000, step=10, key="pf_harga",
+                help="Harga beli rata-rata per lembar saham."
+            )
+            tgl_pf = st.date_input("Tanggal Beli", key="pf_tgl")
+
+        if st.button("Simpan Posisi", key="btn_pf_tambah", type="primary"):
+            if ticker_pf and lot_pf > 0 and harga_beli_pf > 0:
+                portfolio.append({
+                    "ticker": ticker_pf,
+                    "lot": lot_pf,
+                    "harga_beli": harga_beli_pf,
+                    "tanggal_beli": str(tgl_pf),
+                })
+                simpan_portfolio(portfolio)
+                st.success(f"Posisi {ticker_pf.replace('.JK','')} ({lot_pf} lot @ Rp {harga_beli_pf:,}) disimpan.")
+                st.rerun()
+            else:
+                st.error("Lengkapi semua field sebelum menyimpan.")
+
+    # -- Tabel posisi + summary --
+    if not portfolio:
+        st.info("Portfolio masih kosong. Tambahkan posisi pertama kamu di atas.")
+    else:
+        with st.spinner("Menghitung P/L terkini..."):
+            df_pf = hitung_portfolio_summary(portfolio)
+
+        if not df_pf.empty:
+            total_modal = df_pf["_modal_raw"].sum()
+            total_nilai = df_pf["_nilai_kini_raw"].sum()
+            total_pl = df_pf["_pl_rp_raw"].sum()
+            total_pl_pct = (total_pl / total_modal * 100) if total_modal > 0 else 0.0
+            posisi_untung = int((df_pf["_pl_rp_raw"] > 0).sum())
+
+            mc1, mc2, mc3, mc4 = st.columns(4)
+            mc1.metric(
+                "Total Modal", f"Rp {total_modal:,.0f}",
+                help="Total modal yang diinvestasikan termasuk biaya beli broker 0.15%."
+            )
+            mc2.metric(
+                "Nilai Portfolio Kini", f"Rp {total_nilai:,.0f}",
+                help="Estimasi nilai jika semua posisi dijual sekarang (setelah biaya jual 0.25%)."
+            )
+            mc3.metric(
+                "Unrealized P/L", f"Rp {total_pl:+,.0f}",
+                delta=f"{total_pl_pct:+.2f}%",
+                help="Total keuntungan atau kerugian belum terealisasi dari seluruh posisi."
+            )
+            mc4.metric(
+                "Posisi Untung", f"{posisi_untung} / {len(df_pf)}",
+                help="Jumlah posisi yang saat ini berada di atas harga beli."
+            )
+
             st.divider()
 
-            # Metrik & Sinyal
-            tampilkan_metrik_dan_sinyal(d, t, timeframe)
+            tampil_cols = [
+                "Ticker", "Lot", "Harga Beli (Rp)", "Harga Kini (Rp)",
+                "Modal (Rp)", "Nilai Kini (Rp)", "P/L (Rp)", "P/L (%)", "Tgl Beli"
+            ]
+            st.dataframe(df_pf[tampil_cols], use_container_width=True, hide_index=True)
+
             st.divider()
+            st.markdown("**Hapus Posisi:**")
+            idx_hapus = st.selectbox(
+                "Pilih posisi yang ingin dihapus",
+                options=list(range(len(portfolio))),
+                format_func=lambda i: (
+                    f"{portfolio[i]['ticker'].replace('.JK','')} -- "
+                    f"{portfolio[i]['lot']} lot @ Rp {portfolio[i]['harga_beli']:,} "
+                    f"({portfolio[i].get('tanggal_beli', '')})"
+                ),
+                key="pf_hapus_select"
+            )
+            if st.button("Hapus Posisi", key="btn_pf_hapus"):
+                portfolio.pop(idx_hapus)
+                simpan_portfolio(portfolio)
+                st.success("Posisi dihapus.")
+                st.rerun()
 
-            # Fundamental tambahan & Peer group
-            tampilkan_analisis_fundamental_tambahan(t, f)
-            st.divider()
-            tampilkan_peer_group_analysis(t, f)
-            st.divider()
-
-
-
-            # Alat bantu grafik yang dipilih
-            if show_rsi:
-                st.subheader("RSI -- Apakah Saham Mulai Terlalu Mahal/Murah?")
-                fig_rsi = buat_rsi_chart(d)
-                st.pyplot(fig_rsi, use_container_width=True)
-                plt.close(fig_rsi)
-                st.divider()
-
-            if show_macd:
-                st.subheader("MACD")
-                fig_macd = buat_macd_chart(d)
-                st.pyplot(fig_macd, use_container_width=True)
-                plt.close(fig_macd)
-                st.divider()
-
-            if show_vol:
-                st.subheader("Naik-Turun Harga Harian")
-                fig_v = buat_volatilitas_chart(d, t)
-                st.pyplot(fig_v, use_container_width=True)
-                plt.close(fig_v)
-                st.divider()
-
-            if show_stoch:
-                st.subheader("Stochastic -- Tanda Harga Mulai Berbalik")
-                fig_stoch = buat_stochastic_chart(d)
-                st.pyplot(fig_stoch, use_container_width=True)
-                plt.close(fig_stoch)
-                st.divider()
-
-            if show_obv:
-                st.subheader("OBV -- Dukungan dari Volume")
-                fig_obv = buat_obv_chart(d)
-                st.pyplot(fig_obv, use_container_width=True)
-                plt.close(fig_obv)
-                st.divider()
-
-            if show_atr:
-                st.subheader("ATR -- Lebar Gerak Harga")
-                fig_atr = buat_atr_chart(d)
-                st.pyplot(fig_atr, use_container_width=True)
-                plt.close(fig_atr)
-                st.divider()
-
-            # Data Historis
-            tampilkan_data_historis(d, t)
-
-else:
-    # ----------------------------------------
-    # MODE SINGLE SAHAM
-    # ----------------------------------------
-    t_utama = valid_tickers[0]
-    df_utama = dfs[0]
-    fund_utama = fundamentals[0]
-
-    tampilkan_profil_perusahaan(fund_utama, t_utama)
-    st.divider()
-    tampilkan_analisis_fundamental_tambahan(t_utama, fund_utama)
-    st.divider()
-    tampilkan_peer_group_analysis(t_utama, fund_utama)
-    st.divider()
-    tampilkan_metrik_dan_sinyal(df_utama, t_utama, timeframe)
-    st.divider()
-
-
-
-    st.subheader("Grafik Utama")
-    fig_candle = buat_candlestick(
-        df_utama, t_utama, show_ma20, show_ma50, show_bb, tipe_grafik, show_regression
-    )
-    st.pyplot(fig_candle, use_container_width=True)
-    plt.close(fig_candle)
-
-    if show_rsi:
-        st.subheader("RSI -- Apakah Saham Mulai Terlalu Mahal/Murah?")
-        fig_rsi = buat_rsi_chart(df_utama)
-        st.pyplot(fig_rsi, use_container_width=True)
-        plt.close(fig_rsi)
-
-    if show_macd:
-        st.subheader("MACD")
-        fig_macd = buat_macd_chart(df_utama)
-        st.pyplot(fig_macd, use_container_width=True)
-        plt.close(fig_macd)
-
-    if show_vol:
-        st.subheader("Naik-Turun Harga Harian")
-        fig_v = buat_volatilitas_chart(df_utama, t_utama)
-        st.pyplot(fig_v, use_container_width=True)
-        plt.close(fig_v)
-
-    if show_stoch:
-        st.subheader("Stochastic -- Tanda Harga Mulai Berbalik")
-        fig_stoch = buat_stochastic_chart(df_utama)
-        st.pyplot(fig_stoch, use_container_width=True)
-        plt.close(fig_stoch)
-
-    if show_obv:
-        st.subheader("OBV -- Dukungan dari Volume")
-        fig_obv = buat_obv_chart(df_utama)
-        st.pyplot(fig_obv, use_container_width=True)
-        plt.close(fig_obv)
-
-    if show_atr:
-        st.subheader("ATR -- Lebar Gerak Harga")
-        fig_atr = buat_atr_chart(df_utama)
-        st.pyplot(fig_atr, use_container_width=True)
-        plt.close(fig_atr)
-
-    tampilkan_data_historis(df_utama, t_utama)
 
 # ========================================
 # FOOTER
